@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CloudArcade Test Harness</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="harness-container">
+      <!-- Header -->
+      <header class="header">
+        <h1>CloudArcade Test Harness</h1>
+        <p class="subtitle">Simulate platform integration locally</p>
+      </header>
+
+      <!-- Main Content -->
+      <div class="main-content">
+        <!-- Game Frame -->
+        <div class="game-frame-container">
+          <div class="frame-header">
+            <span class="frame-title">Game Preview</span>
+            <div class="frame-controls">
+              <button id="btn-fullscreen" class="btn btn-icon" title="Toggle Fullscreen">⛶</button>
+              <button id="btn-reload" class="btn btn-icon" title="Reload Game">↻</button>
+            </div>
+          </div>
+          <div class="game-frame-wrapper" id="game-frame-wrapper">
+            <iframe id="game-iframe" src="http://localhost:3000" title="Game"></iframe>
+          </div>
+          <div class="frame-size-indicator" id="frame-size">0 × 0</div>
+        </div>
+
+        <!-- Control Panel -->
+        <aside class="control-panel">
+          <!-- Connection Status -->
+          <section class="panel-section">
+            <h2 class="section-title">Connection Status</h2>
+            <div class="status-indicator" id="status-indicator">
+              <span class="status-dot disconnected"></span>
+              <span class="status-text">Waiting for GAME_READY...</span>
+            </div>
+          </section>
+
+          <!-- User Simulation -->
+          <section class="panel-section">
+            <h2 class="section-title">User Simulation</h2>
+            <div class="form-group">
+              <label for="user-type">User Type</label>
+              <select id="user-type">
+                <option value="authenticated">Authenticated User</option>
+                <option value="guest">Guest User</option>
+              </select>
+            </div>
+            <div class="form-group" id="user-id-group">
+              <label for="user-id">User ID</label>
+              <input type="text" id="user-id" value="user_123" />
+            </div>
+            <div class="form-group hidden" id="guest-name-group">
+              <label for="guest-name">Guest Name</label>
+              <input type="text" id="guest-name" value="Player1" />
+            </div>
+            <div class="form-group">
+              <label for="game-id">Game ID</label>
+              <input type="text" id="game-id" value="test_game_001" />
+            </div>
+          </section>
+
+          <!-- Actions -->
+          <section class="panel-section">
+            <h2 class="section-title">Actions</h2>
+            <div class="button-group">
+              <button id="btn-send-user-info" class="btn btn-primary">Send USER_INFO</button>
+              <button id="btn-session-started" class="btn btn-secondary">Simulate SESSION_STARTED</button>
+              <button id="btn-session-ended" class="btn btn-secondary">Simulate SESSION_ENDED</button>
+            </div>
+          </section>
+
+          <!-- Score Simulation -->
+          <section class="panel-section">
+            <h2 class="section-title">Score Response</h2>
+            <div class="form-group">
+              <label for="mock-rank">Mock Rank</label>
+              <input type="number" id="mock-rank" value="1" min="1" />
+            </div>
+            <div class="button-group">
+              <button id="btn-score-success" class="btn btn-success">Simulate SCORE_SUBMITTED</button>
+              <button id="btn-score-error" class="btn btn-danger">Simulate SCORE_ERROR</button>
+            </div>
+          </section>
+
+          <!-- Resize Simulation -->
+          <section class="panel-section">
+            <h2 class="section-title">Container Size</h2>
+            <div class="size-presets">
+              <button class="btn btn-sm" data-size="320x480">Mobile</button>
+              <button class="btn btn-sm" data-size="768x1024">Tablet</button>
+              <button class="btn btn-sm" data-size="1280x720">Desktop</button>
+              <button class="btn btn-sm" data-size="auto">Auto</button>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <!-- Message Log -->
+      <div class="message-log-container">
+        <div class="log-header">
+          <h2 class="section-title">Message Log</h2>
+          <button id="btn-clear-log" class="btn btn-sm">Clear</button>
+        </div>
+        <div class="message-log" id="message-log">
+          <div class="log-entry info">Test harness initialized. Start the game server with <code>npm run dev</code></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="harness.js" type="module"></script>
+  </body>
+</html>

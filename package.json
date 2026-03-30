@@ -1,0 +1,40 @@
+{
+  "name": "cloud-arcade-game-template",
+  "version": "1.0.0",
+  "description": "A React + Canvas template for building games that integrate with the CloudArcade platform",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .ts,.tsx",
+    "test:harness": "vite --config vite.harness.config.ts"
+  },
+  "keywords": [
+    "cloudarcade",
+    "game",
+    "react",
+    "canvas",
+    "typescript",
+    "vite"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.2",
+    "terser": "^5.46.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11"
+  }
+}

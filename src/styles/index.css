@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/* Custom theme */
+@theme {
+  --color-background: #0a0a0b;
+  --color-surface: #141416;
+  --color-primary: #22c55e;
+  --color-destructive: #ef4444;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+/* Base styles */
+@layer base {
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-white font-sans overflow-hidden;
+  }
+
+  #root {
+    @apply w-screen h-screen flex items-center justify-center;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+  }
+}
+
+/* Component styles */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg font-medium transition-all duration-150 ease-out select-none whitespace-nowrap;
+  }
+
+  .btn:hover {
+    @apply brightness-110 -translate-y-0.5;
+  }
+
+  .btn:active {
+    @apply brightness-95 translate-y-0;
+  }
+
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed translate-y-0;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-br from-green-500 to-green-600 text-white shadow-[0_2px_8px_rgba(34,197,94,0.3)];
+  }
+
+  .btn-primary:hover {
+    @apply shadow-[0_4px_12px_rgba(34,197,94,0.4)];
+  }
+
+  .btn-secondary {
+    @apply bg-white/5 text-white border border-white/10;
+  }
+
+  .btn-secondary:hover {
+    @apply bg-white/10 border-white/15;
+  }
+
+  .btn-danger {
+    @apply bg-gradient-to-br from-red-500 to-red-600 text-white shadow-[0_2px_8px_rgba(239,68,68,0.3)];
+  }
+
+  .btn-danger:hover {
+    @apply shadow-[0_4px_12px_rgba(239,68,68,0.4)];
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-md;
+  }
+
+  .btn-md {
+    @apply px-4 py-2 text-sm;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+}
+
+/* Animations */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-spin {
+  animation: spin 0.8s linear infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse 1.5s ease infinite;
+}
