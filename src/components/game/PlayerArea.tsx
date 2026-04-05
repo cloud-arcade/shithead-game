@@ -6,10 +6,10 @@
 import { memo } from 'react';
 import type { Player } from '../../game/types';
 import { CardComponent } from './CardComponent';
-import { getTotalCards } from '../../game/engine';
+import { getTotalCards, getAssetPath } from '../../game/engine';
 
-const AVATAR_ACTIVE = '/assets/game-assets/interface_game/avatar_player_active_1.png';
-const AVATAR_DEFAULT = '/assets/game-assets/interface_game/avatar_player_2.png';
+const AVATAR_ACTIVE = getAssetPath('assets/game-assets/interface_game/avatar_player_active_1.png');
+const AVATAR_DEFAULT = getAssetPath('assets/game-assets/interface_game/avatar_player_2.png');
 
 interface PlayerAreaProps {
   player: Player;

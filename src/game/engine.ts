@@ -531,13 +531,22 @@ export function deserializeState(data: SerializedGameState): ShitheadGameState {
   return data as unknown as ShitheadGameState;
 }
 
-// ── Card Image Path Helper ──────────────────────────────────
+// ── Asset Path Helpers ──────────────────────────────────
+
+/**
+ * Get properly prefixed asset path accounting for Vite base URL
+ */
+export function getAssetPath(path: string): string {
+  const base = import.meta.env.BASE_URL || '/';
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  return `${base}${cleanPath}`;
+}
 
 export function getCardImagePath(card: Card): string {
-  return `/assets/game-assets/cards/${card.suit}/${card.rank}.png`;
+  return getAssetPath(`assets/game-assets/cards/${card.suit}/${card.rank}.png`);
 }
 
 export function getCardBackImagePath(): string {
   // Use the 'S' image (spades back) as card back
-  return `/assets/game-assets/cards/spades/S.png`;
+  return getAssetPath(`assets/game-assets/cards/spades/S.png`);
 }

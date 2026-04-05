@@ -5,6 +5,7 @@
 import { useGameContext } from '../../context/GameContext';
 import { useMultiplayerState } from '../../context/MultiplayerContext';
 import { useCloudArcade } from '../../hooks/useCloudArcade';
+import { getAssetPath } from '../../game/engine';
 import { Button } from '../ui/Button';
 
 export function MenuScreen() {
@@ -22,14 +23,14 @@ export function MenuScreen() {
     <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
       {/* Casino background from table_and_background_color */}
       <img
-        src="/assets/game-assets/table_and_background_color/bg_1.png"
+        src={getAssetPath('assets/game-assets/table_and_background_color/bg_1.png')}
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
         draggable={false}
       />
       {/* Table overlay */}
       <img
-        src="/assets/game-assets/table_and_background_color/table_1.png"
+        src={getAssetPath('assets/game-assets/table_and_background_color/table_1.png')}
         alt=""
         className="absolute top-0 left-0 w-full object-cover object-top"
         style={{ height: '85%' }}
@@ -69,7 +70,7 @@ export function MenuScreen() {
                 >
                   <div className="flex items-center gap-2">
                     <img
-                      src="/assets/game-assets/interface_game/avatar_player_2.png"
+                      src={getAssetPath('assets/game-assets/interface_game/avatar_player_2.png')}
                       alt=""
                       className="w-6 h-6 rounded-full border border-white/20"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
