@@ -251,3 +251,183 @@ export interface LoadProgress {
   percent: number;
   currentAsset?: string;
 }
+
+// ============================================
+// Multiplayer Types
+// ============================================
+
+// --- Data Structures ---
+
+export interface RoomPlayer {
+  socketId: string;
+  userId: string | null;
+  displayName: string;
+  playerNumber: number;
+  status: 'waiting' | 'ready' | 'playing' | 'disconnected';
+  isHost: boolean;
+  meta: Record<string, unknown>;
+}
+
+export interface RoomSnapshot {
+  roomId: string;
+  inviteCode: string;
+  gameId: string;
+  gameName: string;
+  status: 'waiting' | 'in_progress' | 'ended';
+  hostSocketId: string;
+  players: RoomPlayer[];
+  turnOrder: string[];
+  currentTurn: string | null;
+  gameState: Record<string, unknown>;
+  minPlayers: number;
+  maxPlayers: number;
+}
+
+// --- Messages: Game → Parent (outgoing) ---
+
+export type MultiplayerOutgoingMessageType =
+  | 'MP_SEND_ACTION'
+  | 'MP_SET_STATE'
+  | 'MP_END_TURN'
+  | 'MP_UPDATE_META'
+  | 'MP_END_GAME'
+  | 'MP_REQUEST_STATE';
+
+export interface MpSendActionMessage {
+  type: 'MP_SEND_ACTION';
+  payload: {
+    action: string;
+    data: Record<string, unknown>;
+  };
+}
+
+export interface MpSetStateMessage {
+  type: 'MP_SET_STATE';
+  payload: {
+    state: Record<string, unknown>;
+  };
+}
+
+export interface MpEndTurnMessage {
+  type: 'MP_END_TURN';
+  payload: {
+    nextPlayerSocketId?: string;
+  };
+}
+
+export interface MpUpdateMetaMessage {
+  type: 'MP_UPDATE_META';
+  payload: {
+    meta: Record<string, unknown>;
+  };
+}
+
+export interface MpEndGameMessage {
+  type: 'MP_END_GAME';
+}
+
+export interface MpRequestStateMessage {
+  type: 'MP_REQUEST_STATE';
+}
+
+export type MultiplayerOutgoingMessage =
+  | MpSendActionMessage
+  | MpSetStateMessage
+  | MpEndTurnMessage
+  | MpUpdateMetaMessage
+  | MpEndGameMessage
+  | MpRequestStateMessage;
+
+// --- Messages: Parent → Game (incoming) ---
+
+export type MultiplayerIncomingMessageType =
+  | 'MP_ACTION'
+  | 'MP_STATE_UPDATE'
+  | 'MP_GAME_STARTED'
+  | 'MP_GAME_ENDED'
+  | 'MP_TURN_CHANGED'
+  | 'MP_ROOM_STATE'
+  | 'MP_ERROR';
+
+export interface MpActionMessage {
+  type: 'MP_ACTION';
+  payload: {
+    action: string;
+    data: Record<string, unknown>;
+    senderSocketId: string;
+  };
+}
+
+export interface MpStateUpdateMessage {
+  type: 'MP_STATE_UPDATE';
+  payload: {
+    gameState: Record<string, unknown>;
+  };
+}
+
+export interface MpGameStartedMessage {
+  type: 'MP_GAME_STARTED';
+  payload: {
+    room: RoomSnapshot;
+    mySocketId: string;
+    isHost: boolean;
+    isMyTurn: boolean;
+  };
+}
+
+export interface MpGameEndedMessage {
+  type: 'MP_GAME_ENDED';
+  payload: {
+    room: RoomSnapshot;
+  };
+}
+
+export interface MpTurnChangedMessage {
+  type: 'MP_TURN_CHANGED';
+  payload: {
+    currentTurn: string;
+    isMyTurn: boolean;
+    turnOrder: string[];
+  };
+}
+
+export interface MpRoomStateMessage {
+  type: 'MP_ROOM_STATE';
+  payload: {
+    room: RoomSnapshot;
+    mySocketId: string;
+    isHost: boolean;
+    isMyTurn: boolean;
+  };
+}
+
+export interface MpErrorMessage {
+  type: 'MP_ERROR';
+  payload: {
+    code: string;
+    message: string;
+  };
+}
+
+export type MultiplayerIncomingMessage =
+  | MpActionMessage
+  | MpStateUpdateMessage
+  | MpGameStartedMessage
+  | MpGameEndedMessage
+  | MpTurnChangedMessage
+  | MpRoomStateMessage
+  | MpErrorMessage;
+
+// --- Multiplayer Event Map ---
+
+export interface MultiplayerEvents {
+  roomState: (payload: MpRoomStateMessage['payload']) => void;
+  gameStarted: (payload: MpGameStartedMessage['payload']) => void;
+  gameEnded: (payload: MpGameEndedMessage['payload']) => void;
+  action: (payload: MpActionMessage['payload']) => void;
+  stateUpdate: (payload: MpStateUpdateMessage['payload']) => void;
+  turnChanged: (payload: MpTurnChangedMessage['payload']) => void;
+  error: (payload: MpErrorMessage['payload']) => void;
+}
+
+export type MultiplayerEventType = keyof MultiplayerEvents;

@@ -100,6 +100,53 @@
               <button class="btn btn-sm" data-size="auto">Auto</button>
             </div>
           </section>
+
+          <!-- ════════════════════════════════════════════════
+               MULTIPLAYER SIMULATION
+               ════════════════════════════════════════════════ -->
+
+          <section class="panel-section panel-section--mp">
+            <h2 class="section-title section-title--mp">Multiplayer Room</h2>
+            <div class="form-group">
+              <label for="mp-room-id">Room ID</label>
+              <input type="text" id="mp-room-id" value="room_001" />
+            </div>
+            <div class="form-group">
+              <label for="mp-invite-code">Invite Code</label>
+              <input type="text" id="mp-invite-code" value="ABC123" />
+            </div>
+            <div class="form-group">
+              <label for="mp-player-count">Players</label>
+              <select id="mp-player-count">
+                <option value="2" selected>2 Players</option>
+                <option value="3">3 Players</option>
+                <option value="4">4 Players</option>
+              </select>
+            </div>
+            <div class="button-group">
+              <button id="btn-mp-room-state" class="btn btn-mp">Send MP_ROOM_STATE</button>
+              <button id="btn-mp-game-started" class="btn btn-mp">Send MP_GAME_STARTED</button>
+              <button id="btn-mp-game-ended" class="btn btn-mp-danger">Send MP_GAME_ENDED</button>
+            </div>
+          </section>
+
+          <section class="panel-section panel-section--mp">
+            <h2 class="section-title section-title--mp">MP Actions &amp; Turns</h2>
+            <div class="form-group">
+              <label for="mp-action-name">Action Name</label>
+              <input type="text" id="mp-action-name" value="PLACE_PIECE" />
+            </div>
+            <div class="form-group">
+              <label for="mp-action-data">Action Data (JSON)</label>
+              <input type="text" id="mp-action-data" value='{"x":1,"y":2}' />
+            </div>
+            <div class="button-group">
+              <button id="btn-mp-action" class="btn btn-mp">Send MP_ACTION</button>
+              <button id="btn-mp-turn-changed" class="btn btn-mp">Send MP_TURN_CHANGED</button>
+              <button id="btn-mp-state-update" class="btn btn-mp">Send MP_STATE_UPDATE</button>
+              <button id="btn-mp-error" class="btn btn-mp-danger">Send MP_ERROR</button>
+            </div>
+          </section>
         </aside>
       </div>
 

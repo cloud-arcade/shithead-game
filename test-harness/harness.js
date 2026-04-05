@@ -34,6 +34,25 @@ let isConnected = false;
 let currentSession = null;
 let lastScore = null;
 
+// Multiplayer DOM elements
+const mpRoomIdInput = document.getElementById('mp-room-id');
+const mpInviteCodeInput = document.getElementById('mp-invite-code');
+const mpPlayerCountSelect = document.getElementById('mp-player-count');
+const mpActionNameInput = document.getElementById('mp-action-name');
+const mpActionDataInput = document.getElementById('mp-action-data');
+
+const btnMpRoomState = document.getElementById('btn-mp-room-state');
+const btnMpGameStarted = document.getElementById('btn-mp-game-started');
+const btnMpGameEnded = document.getElementById('btn-mp-game-ended');
+const btnMpAction = document.getElementById('btn-mp-action');
+const btnMpTurnChanged = document.getElementById('btn-mp-turn-changed');
+const btnMpStateUpdate = document.getElementById('btn-mp-state-update');
+const btnMpError = document.getElementById('btn-mp-error');
+
+// Multiplayer state
+let mpMySocketId = 'sock_' + Math.random().toString(36).slice(2, 8);
+let mpCurrentTurnIndex = 0;
+
 // ============================================
 // Message Handling
 // ============================================
@@ -70,6 +89,25 @@ function handleGameMessage(event) {
       break;
     case 'GAME_ERROR':
       handleGameError(data.payload);
+      break;
+    // ── Multiplayer outgoing messages from game ──
+    case 'MP_SEND_ACTION':
+      handleMpSendAction(data.payload);
+      break;
+    case 'MP_SET_STATE':
+      handleMpSetState(data.payload);
+      break;
+    case 'MP_END_TURN':
+      handleMpEndTurn(data.payload);
+      break;
+    case 'MP_UPDATE_META':
+      logInfo(`MP_UPDATE_META: ${JSON.stringify(data.payload)}`);
+      break;
+    case 'MP_END_GAME':
+      handleMpEndGameFromGame();
+      break;
+    case 'MP_REQUEST_STATE':
+      logInfo('Game requested MP state (MP_REQUEST_STATE). Click "Send MP_ROOM_STATE" to respond.');
       break;
   }
 }
@@ -359,3 +397,170 @@ new ResizeObserver(updateFrameSize).observe(gameFrameWrapper);
 // Initialize
 updateFrameSize();
 logInfo('Test harness ready. Start the game server with <code>npm run dev</code>');
+
+// ============================================
+// Multiplayer Helpers
+// ============================================
+
+/** Build a mock RoomSnapshot based on current harness inputs. */
+function buildMockRoom(status = 'in_progress') {
+  const count = parseInt(mpPlayerCountSelect.value) || 2;
+  const players = [];
+  const turnOrder = [];
+
+  for (let i = 0; i < count; i++) {
+    const sid = i === 0 ? mpMySocketId : `sock_opponent_${i}`;
+    turnOrder.push(sid);
+    players.push({
+      socketId: sid,
+      userId: i === 0 ? (userTypeSelect.value === 'authenticated' ? userIdInput.value : null) : null,
+      displayName: i === 0 ? 'You' : `Player ${i + 1}`,
+      playerNumber: i + 1,
+      status: status === 'waiting' ? 'waiting' : 'playing',
+      isHost: i === 0,
+      meta: {},
+    });
+  }
+
+  return {
+    roomId: mpRoomIdInput.value,
+    inviteCode: mpInviteCodeInput.value,
+    gameId: gameIdInput.value,
+    gameName: 'Test Game',
+    status,
+    hostSocketId: mpMySocketId,
+    players,
+    turnOrder,
+    currentTurn: turnOrder[mpCurrentTurnIndex % turnOrder.length],
+    gameState: {},
+    minPlayers: 2,
+    maxPlayers: count,
+  };
+}
+
+function simulateMpRoomState() {
+  const room = buildMockRoom('waiting');
+  sendMessageToGame({
+    type: 'MP_ROOM_STATE',
+    payload: {
+      room,
+      mySocketId: mpMySocketId,
+      isHost: true,
+      isMyTurn: room.currentTurn === mpMySocketId,
+    },
+  });
+}
+
+function simulateMpGameStarted() {
+  mpCurrentTurnIndex = 0;
+  const room = buildMockRoom('in_progress');
+  sendMessageToGame({
+    type: 'MP_GAME_STARTED',
+    payload: {
+      room,
+      mySocketId: mpMySocketId,
+      isHost: true,
+      isMyTurn: room.currentTurn === mpMySocketId,
+    },
+  });
+}
+
+function simulateMpGameEnded() {
+  const room = buildMockRoom('ended');
+  sendMessageToGame({
+    type: 'MP_GAME_ENDED',
+    payload: { room },
+  });
+}
+
+function simulateMpAction() {
+  let data = {};
+  try { data = JSON.parse(mpActionDataInput.value); } catch { /* use empty */ }
+  sendMessageToGame({
+    type: 'MP_ACTION',
+    payload: {
+      action: mpActionNameInput.value || 'UNKNOWN',
+      data,
+      senderSocketId: 'sock_opponent_1',
+    },
+  });
+}
+
+function simulateMpTurnChanged() {
+  const count = parseInt(mpPlayerCountSelect.value) || 2;
+  mpCurrentTurnIndex = (mpCurrentTurnIndex + 1) % count;
+  const turnOrder = [mpMySocketId];
+  for (let i = 1; i < count; i++) turnOrder.push(`sock_opponent_${i}`);
+  const currentTurn = turnOrder[mpCurrentTurnIndex];
+
+  sendMessageToGame({
+    type: 'MP_TURN_CHANGED',
+    payload: {
+      currentTurn,
+      isMyTurn: currentTurn === mpMySocketId,
+      turnOrder,
+    },
+  });
+}
+
+function simulateMpStateUpdate() {
+  let data = {};
+  try { data = JSON.parse(mpActionDataInput.value); } catch { /* use empty */ }
+  sendMessageToGame({
+    type: 'MP_STATE_UPDATE',
+    payload: { gameState: data },
+  });
+}
+
+function simulateMpError() {
+  sendMessageToGame({
+    type: 'MP_ERROR',
+    payload: {
+      code: 'SIMULATED_ERROR',
+      message: 'This is a test error from the harness.',
+    },
+  });
+}
+
+// When the game sends MP_SEND_ACTION, echo it back as MP_ACTION to all players
+function handleMpSendAction(payload) {
+  logInfo(`Game sent action: ${payload.action}`);
+  sendMessageToGame({
+    type: 'MP_ACTION',
+    payload: {
+      action: payload.action,
+      data: payload.data || {},
+      senderSocketId: mpMySocketId,
+    },
+  });
+}
+
+// When the game sends MP_SET_STATE, echo it back as MP_STATE_UPDATE
+function handleMpSetState(payload) {
+  logInfo('Game set shared state');
+  sendMessageToGame({
+    type: 'MP_STATE_UPDATE',
+    payload: { gameState: payload.state || {} },
+  });
+}
+
+// When the game ends its turn, advance and notify
+function handleMpEndTurn(payload) {
+  logInfo('Game ended turn');
+  simulateMpTurnChanged();
+}
+
+// When the game sends MP_END_GAME
+function handleMpEndGameFromGame() {
+  logInfo('Game ended multiplayer session');
+  simulateMpGameEnded();
+}
+
+// ── Multiplayer event listeners ──
+btnMpRoomState.addEventListener('click', simulateMpRoomState);
+btnMpGameStarted.addEventListener('click', simulateMpGameStarted);
+btnMpGameEnded.addEventListener('click', simulateMpGameEnded);
+btnMpAction.addEventListener('click', simulateMpAction);
+btnMpTurnChanged.addEventListener('click', simulateMpTurnChanged);
+btnMpStateUpdate.addEventListener('click', simulateMpStateUpdate);
+btnMpError.addEventListener('click', simulateMpError);
