@@ -35,7 +35,7 @@ export function GameOverScreen() {
       <img
         src={getAssetPath('assets/game-assets/interface_game/table_1.png')}
         alt=""
-        className="absolute top-0 left-0 w-full h-[95vh] object-cover object-top lg:h-[105vh] lg:object-bottom"
+        className="absolute top-0 left-0 w-full h-screen object-cover object-top lg:object-bottom"
         draggable={false}
       />
       <div className="absolute inset-0 bg-black/40" />

@@ -28,11 +28,11 @@ export function MenuScreen() {
         className="absolute inset-0 w-full h-full object-cover"
         draggable={false}
       />
-      {/* Table overlay - mobile: top-aligned, desktop: bottom-aligned to preserve rounded edge */}
+      {/* Table overlay - full screen height, preserve rounded edge on desktop */}
       <img
         src={getAssetPath('assets/game-assets/interface_game/table_1.png')}
         alt=""
-        className="absolute top-0 left-0 w-full h-[110vh] object-cover object-top lg:h-[105vh] lg:object-bottom"
+        className="absolute top-0 left-0 w-full h-screen object-cover object-top lg:object-bottom"
         draggable={false}
       />
       <div className="absolute inset-0 bg-black/30" />
