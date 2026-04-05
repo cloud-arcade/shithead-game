@@ -152,6 +152,45 @@ export function swapCards(
   return { ...state, players, lastActionTime: Date.now() };
 }
 
+// ── Redraw Hand (pre-game) ──────────────────────────────────
+
+/**
+ * Drop all 3 hand cards back into the draw pile and draw 3 fresh ones.
+ * Can only be used once during the swapping phase.
+ */
+export function redrawHand(
+  state: ShitheadGameState,
+  socketId: string
+): ShitheadGameState {
+  if (state.phase !== 'swapping') return state;
+
+  const player = state.players.find((p) => p.socketId === socketId);
+  if (!player) return state;
+
+  const handCards = player.cards.hand;
+  if (handCards.length === 0) return state;
+
+  // Put hand cards back into draw pile and shuffle
+  const newDrawPile = shuffleDeck([...state.drawPile, ...handCards]);
+
+  // Draw fresh cards
+  const newHand = newDrawPile.slice(0, Math.min(3, newDrawPile.length));
+  const remainingDraw = newDrawPile.slice(newHand.length);
+
+  const players = state.players.map((p) => {
+    if (p.socketId !== socketId) return p;
+    return { ...p, cards: { ...p.cards, hand: newHand } };
+  });
+
+  return {
+    ...state,
+    players,
+    drawPile: remainingDraw,
+    lastMessage: `${player.displayName} redrew their hand!`,
+    lastActionTime: Date.now(),
+  };
+}
+
 // ── Start Playing ───────────────────────────────────────────
 
 export function startPlaying(state: ShitheadGameState): ShitheadGameState {

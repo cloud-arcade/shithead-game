@@ -3,8 +3,10 @@
  * Renders the appropriate phase: swapping, playing, or finished.
  */
 
+import { useEffect } from 'react';
 import { useShitheadGame } from '../../hooks/useShitheadGame';
 import { useMultiplayerState } from '../../context/MultiplayerContext';
+import { requestFullscreenLandscape, exitFullscreenLandscape } from '../../platform/fullscreen';
 import { SwapPhase } from '../game/SwapPhase';
 import { GameBoard } from '../game/GameBoard';
 import { GameOverView } from '../game/GameOverView';
@@ -18,6 +20,7 @@ export function GameScreen() {
     isMyTurn,
     deal,
     doSwapCards,
+    doRedrawHand,
     doStartGame,
     doPlayCards,
     doPickUpPile,
@@ -25,81 +28,107 @@ export function GameScreen() {
 
   const mp = useMultiplayerState();
 
-  // If game hasn't been dealt yet and we're host, deal
-  if (gameState.phase === 'waiting' && isHost && mp.players.length >= 2) {
-    setTimeout(() => deal(), 0);
-  }
+  // Force fullscreen landscape while game is active
+  useEffect(() => {
+    requestFullscreenLandscape();
+    return () => exitFullscreenLandscape();
+  }, []);
+
+  // Host auto-deals when the game screen mounts with enough players
+  useEffect(() => {
+    if (gameState.phase === 'waiting' && isHost && mp.players.length >= 2) {
+      deal();
+    }
+  }, [gameState.phase, isHost, mp.players.length, deal]);
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-gradient-to-b from-zinc-950 via-[#0d1117] to-zinc-950">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-black/40 border-b border-white/5 shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm">🃏</span>
-          <span className="text-xs font-medium text-zinc-400">Shithead</span>
-        </div>
-        <div className="flex items-center gap-3 text-[0.6rem] text-zinc-500">
-          {gameState.phase !== 'waiting' && (
-            <>
-              <span>Draw: {gameState.drawPile.length}</span>
-              <span>Pile: {gameState.pile.length}</span>
-            </>
-          )}
-          <span className={`uppercase tracking-wider ${
-            gameState.phase === 'playing' ? 'text-emerald-400' :
-            gameState.phase === 'finished' ? 'text-red-400' :
-            'text-yellow-400'
-          }`}>
-            {gameState.phase}
-          </span>
-        </div>
-      </div>
+    <div className="absolute inset-0 overflow-hidden">
+      {/* Full-bleed casino background */}
+      <img
+        src="/assets/game-assets/table_and_background_color/bg_1.png"
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+        draggable={false}
+      />
 
-      {/* Main content */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {/* Waiting for deal */}
-        {gameState.phase === 'waiting' && (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
-            <div className="w-10 h-10 border-[3px] border-white/10 border-t-yellow-400 rounded-full animate-spin" />
-            <p className="text-sm text-zinc-400">
-              {mp.players.length < 2
-                ? 'Waiting for more players...'
-                : isHost
-                ? 'Dealing cards...'
-                : 'Waiting for host to deal...'}
-            </p>
+      {/* Table PNG overlay — covers top ~88% with gap at bottom revealing bg */}
+      <img
+        src="/assets/game-assets/table_and_background_color/table_1.png"
+        alt=""
+        className="absolute top-0 left-0 w-full object-cover object-top"
+        style={{ height: '88%' }}
+        draggable={false}
+      />
+
+      {/* Content layer */}
+      <div className="relative z-10 flex flex-col h-full">
+        {/* Slim top HUD bar */}
+        <div className="flex items-center justify-between px-3 py-1 shrink-0"
+          style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 100%)' }}
+        >
+          <span className="text-[0.6rem] font-bold text-gold-light uppercase tracking-widest drop-shadow">Shithead</span>
+          <div className="flex items-center gap-2 text-[0.5rem] font-semibold">
+            {gameState.phase !== 'waiting' && (
+              <>
+                <span className="text-white/50">Draw {gameState.drawPile.length}</span>
+                <span className="text-white/20">|</span>
+                <span className="text-white/50">Pile {gameState.pile.length}</span>
+                <span className="text-white/20">|</span>
+              </>
+            )}
+            <span className={`uppercase tracking-wider font-bold ${
+              gameState.phase === 'playing' ? 'text-green-400' :
+              gameState.phase === 'finished' ? 'text-red-400' :
+              'text-gold'
+            }`}>
+              {gameState.phase}
+            </span>
           </div>
-        )}
+        </div>
 
-        {/* Swap phase */}
-        {gameState.phase === 'swapping' && myPlayer && (
-          <div className="flex items-center justify-center h-full p-4">
+        {/* Main content area */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {/* Waiting for deal */}
+          {gameState.phase === 'waiting' && (
+            <div className="flex flex-col items-center justify-center h-full gap-3">
+              <div className="w-8 h-8 border-[3px] border-white/10 border-t-gold rounded-full animate-spin" />
+              <p className="text-xs text-white/70 font-medium drop-shadow">
+                {mp.players.length < 2
+                  ? 'Waiting for more players...'
+                  : isHost
+                  ? 'Dealing cards...'
+                  : 'Waiting for host to deal...'}
+              </p>
+            </div>
+          )}
+
+          {/* Swap phase */}
+          {gameState.phase === 'swapping' && myPlayer && (
             <SwapPhase
               myPlayer={myPlayer}
               isHost={isHost}
               onSwap={doSwapCards}
+              onRedraw={doRedrawHand}
               onReady={doStartGame}
             />
-          </div>
-        )}
+          )}
 
-        {/* Playing phase */}
-        {gameState.phase === 'playing' && (
-          <GameBoard
-            gameState={gameState}
-            mySocketId={mySocketId}
-            isMyTurn={isMyTurn}
-            onPlayCards={doPlayCards}
-            onPickUpPile={doPickUpPile}
-          />
-        )}
+          {/* Playing phase */}
+          {gameState.phase === 'playing' && (
+            <GameBoard
+              gameState={gameState}
+              mySocketId={mySocketId}
+              isMyTurn={isMyTurn}
+              onPlayCards={doPlayCards}
+              onPickUpPile={doPickUpPile}
+            />
+          )}
 
-        {/* Game over */}
-        {gameState.phase === 'finished' && (
-          <div className="flex items-center justify-center h-full">
+          {/* Game over */}
+          {gameState.phase === 'finished' && (
             <GameOverView gameState={gameState} mySocketId={mySocketId} />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

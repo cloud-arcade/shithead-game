@@ -78,6 +78,7 @@ export interface ShitheadGameState {
 export type ShitheadAction =
   | { action: 'DEAL'; data: { gameState: SerializedGameState } }
   | { action: 'SWAP_CARDS'; data: { handIndex: number; faceUpIndex: number } }
+  | { action: 'REDRAW_HAND'; data: { socketId: string } }
   | { action: 'READY_TO_PLAY'; data: Record<string, never> }
   | { action: 'PLAY_CARDS'; data: { cardIds: string[] } }
   | { action: 'PLAY_FACE_DOWN'; data: { cardIndex: number } }

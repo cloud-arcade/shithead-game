@@ -1,8 +1,10 @@
 /**
- * GameBoard — Main game view during the playing phase
+ * GameBoard — Blackjack-style casino table with 4 player slots.
+ * Players spread evenly across the table with avatars underneath.
+ * Draw/discard piles at center top, player area at bottom.
  */
 
-import { useState, useCallback, useMemo, memo } from 'react';
+import { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import type { ShitheadGameState, Card } from '../../game/types';
 import { canPlayOnPile, areAllSameRank, getPlayerPlayableZone, hasPlayableCard } from '../../game/engine';
 import { PlayerArea } from './PlayerArea';
@@ -15,6 +17,8 @@ interface GameBoardProps {
   onPlayCards: (cardIds: string[]) => void;
   onPickUpPile: () => void;
 }
+
+const MAX_SEATS = 4;
 
 export const GameBoard = memo(function GameBoard({
   gameState,
@@ -30,7 +34,29 @@ export const GameBoard = memo(function GameBoard({
   const myZone = myPlayer ? getPlayerPlayableZone(myPlayer) : null;
   const canIPlay = mySocketId ? hasPlayableCard(gameState, mySocketId) : false;
 
-  // Get the first selected card's rank for multi-select validation
+  // Build 4-slot layout: center opponents in the available seats
+  const seats = useMemo(() => {
+    const emptySeats = MAX_SEATS - 1; // minus 1 for "me"
+    const seatArr: (typeof opponents[number] | null)[] = Array(emptySeats).fill(null);
+    // Center opponents: if 1 opponent put in middle, if 2 put 0 & 2, if 3 fill all
+    if (opponents.length === 1) {
+      seatArr[1] = opponents[0]; // center
+    } else if (opponents.length === 2) {
+      seatArr[0] = opponents[0];
+      seatArr[2] = opponents[1];
+    } else {
+      opponents.forEach((opp, i) => {
+        if (i < emptySeats) seatArr[i] = opp;
+      });
+    }
+    return seatArr;
+  }, [opponents]);
+
+  // Clear selection when the turn changes
+  useEffect(() => {
+    setSelectedCards(new Set());
+  }, [gameState.currentTurn]);
+
   const selectedRank = useMemo(() => {
     if (selectedCards.size === 0 || !myPlayer) return null;
     const zone = myZone === 'hand' ? myPlayer.cards.hand :
@@ -42,25 +68,19 @@ export const GameBoard = memo(function GameBoard({
 
   const handleCardClick = useCallback((cardId: string) => {
     if (!isMyTurn || !myPlayer || !myZone) return;
-
-    // Face-down cards: play immediately (single card)
     if (myZone === 'faceDown') {
       onPlayCards([cardId]);
       return;
     }
-
     const zone = myZone === 'hand' ? myPlayer.cards.hand : myPlayer.cards.faceUp;
     const card = zone.find((c) => c.id === cardId);
     if (!card) return;
-
     setSelectedCards((prev) => {
       const next = new Set(prev);
       if (next.has(cardId)) {
         next.delete(cardId);
       } else {
-        // Only allow selecting cards of the same rank
         if (next.size > 0 && card.rank !== selectedRank) {
-          // Different rank — start new selection
           return new Set([cardId]);
         }
         next.add(cardId);
@@ -71,8 +91,7 @@ export const GameBoard = memo(function GameBoard({
 
   const handlePlay = useCallback(() => {
     if (selectedCards.size === 0) return;
-    const ids = Array.from(selectedCards);
-    onPlayCards(ids);
+    onPlayCards(Array.from(selectedCards));
     setSelectedCards(new Set());
   }, [selectedCards, onPlayCards]);
 
@@ -81,7 +100,6 @@ export const GameBoard = memo(function GameBoard({
     setSelectedCards(new Set());
   }, [onPickUpPile]);
 
-  // Validate selection for play button
   const canPlaySelection = useMemo(() => {
     if (selectedCards.size === 0 || !myPlayer || !myZone || !isMyTurn) return false;
     const zone = myZone === 'hand' ? myPlayer.cards.hand : myPlayer.cards.faceUp;
@@ -95,72 +113,91 @@ export const GameBoard = memo(function GameBoard({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Opponents area (top) */}
-      <div className="shrink-0 flex justify-center gap-1 sm:gap-2 p-1 sm:p-2 flex-wrap max-h-[28%] overflow-hidden">
-        {opponents.map((p) => (
-          <PlayerArea
-            key={p.socketId}
-            player={p}
-            isMe={false}
-            isCurrentTurn={gameState.currentTurn === p.socketId}
-            selectedCardIds={new Set()}
-            playableZone={null}
-            compact
+      {/* ── Upper table area: piles + opponent seats ── */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Center pile row */}
+        <div className="shrink-0 flex items-center justify-center py-1">
+          <PileArea
+            pile={gameState.pile}
+            drawPileCount={gameState.drawPile.length}
+            burnedCount={gameState.burned.length}
           />
-        ))}
-      </div>
-
-      {/* Center: Pile area */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-2 min-h-0 overflow-hidden">
-        <PileArea
-          pile={gameState.pile}
-          drawPileCount={gameState.drawPile.length}
-          burnedCount={gameState.burned.length}
-        />
+        </div>
 
         {/* Game message */}
         {gameState.lastMessage && (
-          <div className="text-center px-3 py-1 bg-black/40 rounded-lg max-w-md">
-            <p className="text-[0.65rem] sm:text-xs text-zinc-300">{gameState.lastMessage}</p>
+          <div className="text-center px-3 shrink-0">
+            <span className="inline-block px-3 py-0.5 bg-black/50 rounded-full text-[0.55rem] text-white/80 font-medium backdrop-blur-sm">
+              {gameState.lastMessage}
+            </span>
           </div>
         )}
 
-        {/* Action buttons */}
-        {isMyTurn && !myPlayer?.isFinished && (
-          <div className="flex gap-2">
-            <button
-              onClick={handlePlay}
-              disabled={!canPlaySelection}
-              className="btn btn-primary btn-sm"
-            >
-              Play {selectedCards.size > 0 ? `(${selectedCards.size})` : ''}
-            </button>
-            <button
-              onClick={handlePickUp}
-              disabled={gameState.pile.length === 0}
-              className="btn btn-danger btn-sm"
-            >
-              Pick Up Pile
-            </button>
-          </div>
-        )}
-
-        {isMyTurn && !canIPlay && myZone !== 'faceDown' && myZone !== null && (
-          <p className="text-[0.6rem] sm:text-xs text-red-400">No playable cards — pick up the pile!</p>
-        )}
+        {/* Opponent seats row — evenly spaced across table */}
+        <div className="flex-1 flex items-start justify-evenly px-2 pt-1 min-h-0 overflow-hidden">
+          {seats.map((player, i) => (
+            <div key={i} className="flex flex-col items-center" style={{ minWidth: '22%', maxWidth: '25%' }}>
+              {player ? (
+                <PlayerArea
+                  player={player}
+                  isMe={false}
+                  isCurrentTurn={gameState.currentTurn === player.socketId}
+                  selectedCardIds={new Set()}
+                  playableZone={null}
+                  compact
+                />
+              ) : (
+                /* Empty seat placeholder */
+                <div className="flex flex-col items-center gap-1 opacity-20">
+                  <div className="w-8 h-8 rounded-full border border-dashed border-white/30 flex items-center justify-center">
+                    <span className="text-[0.5rem] text-white/30">?</span>
+                  </div>
+                  <span className="text-[0.45rem] text-white/20 uppercase tracking-wider">Empty</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* My area (bottom) */}
+      {/* ── Bottom area: my cards + action buttons ── */}
       {myPlayer && (
-        <div className="shrink-0 p-1 sm:p-2 border-t border-white/5 bg-black/20 max-h-[40%] overflow-hidden">
-          <PlayerArea
-            player={myPlayer}
-            isMe
-            isCurrentTurn={isMyTurn}
-            selectedCardIds={selectedCards}
-            playableZone={isMyTurn ? myZone : null}
-            onCardClick={handleCardClick}
-          />
+        <div className="shrink-0 max-h-[42%] overflow-hidden">
+          {/* Action buttons */}
+          <div className="flex items-center justify-center gap-2 py-1">
+            {isMyTurn && !myPlayer.isFinished && (
+              <>
+                <button
+                  onClick={handlePlay}
+                  disabled={!canPlaySelection}
+                  className="btn btn-primary btn-sm"
+                >
+                  Play {selectedCards.size > 0 ? `(${selectedCards.size})` : ''}
+                </button>
+                <button
+                  onClick={handlePickUp}
+                  disabled={gameState.pile.length === 0}
+                  className="btn btn-danger btn-sm"
+                >
+                  Pick Up
+                </button>
+              </>
+            )}
+            {isMyTurn && !canIPlay && myZone !== 'faceDown' && myZone !== null && (
+              <span className="text-[0.55rem] text-red-300 font-medium drop-shadow">No playable cards — pick up!</span>
+            )}
+          </div>
+          {/* My player area */}
+          <div className="px-2 pb-1">
+            <PlayerArea
+              player={myPlayer}
+              isMe
+              isCurrentTurn={isMyTurn}
+              selectedCardIds={selectedCards}
+              playableZone={isMyTurn ? myZone : null}
+              onCardClick={handleCardClick}
+            />
+          </div>
         </div>
       )}
     </div>

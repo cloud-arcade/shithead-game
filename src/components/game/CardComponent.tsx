@@ -1,5 +1,5 @@
 /**
- * CardComponent — Renders a single playing card
+ * CardComponent — Casino-style playing card
  */
 
 import { memo, useState } from 'react';
@@ -28,9 +28,10 @@ export const CardComponent = memo(function CardComponent({
   const [imgError, setImgError] = useState(false);
   const src = faceDown ? getCardBackImagePath() : getCardImagePath(card);
 
+  // Landscape-first sizing: small for opponents/compact, normal for player hand
   const sizeClass = small
-    ? 'w-8 h-[2.8rem] sm:w-10 sm:h-[3.5rem] md:w-12 md:h-[4.2rem] lg:w-14 lg:h-[4.9rem]'
-    : 'w-11 h-[3.85rem] sm:w-14 sm:h-[4.9rem] md:w-16 md:h-[5.6rem] lg:w-20 lg:h-[7rem]';
+    ? 'w-7 h-[2.45rem] sm:w-8 sm:h-[2.8rem] md:w-10 md:h-[3.5rem]'
+    : 'w-10 h-[3.5rem] sm:w-12 sm:h-[4.2rem] md:w-14 md:h-[4.9rem]';
 
   return (
     <button
@@ -38,28 +39,28 @@ export const CardComponent = memo(function CardComponent({
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       className={`
-        relative rounded-lg overflow-hidden transition-all duration-200 ease-out
+        relative rounded-md overflow-hidden transition-all duration-200 ease-out card-shadow
         ${sizeClass}
-        ${!disabled && onClick ? 'cursor-pointer hover:brightness-110 active:scale-95' : 'cursor-default'}
-        ${selected ? '-translate-y-2 ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : ''}
-        ${disabled ? 'opacity-60' : ''}
+        ${!disabled && onClick ? 'cursor-pointer hover:brightness-110 hover:-translate-y-1 active:scale-95' : 'cursor-default'}
+        ${selected ? '-translate-y-2 ring-2 ring-gold-light shadow-[0_0_12px_rgba(240,208,96,0.5)]' : ''}
+        ${disabled ? 'opacity-70' : ''}
         ${className}
       `}
     >
       {imgError ? (
-        <div className={`w-full h-full flex items-center justify-center bg-white rounded-lg border-2 ${
-          faceDown ? 'border-blue-600 bg-blue-900' : 'border-gray-300'
+        <div className={`w-full h-full flex items-center justify-center rounded-md border ${
+          faceDown ? 'border-blue-700 bg-blue-950' : 'border-gray-400 bg-white'
         }`}>
           {faceDown ? (
-            <span className="text-xs text-blue-200 font-bold">?</span>
+            <span className="text-[0.5rem] text-blue-300 font-bold">?</span>
           ) : (
             <div className="flex flex-col items-center">
-              <span className={`text-xs font-bold ${
+              <span className={`text-[0.55rem] font-bold ${
                 card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-gray-900'
               }`}>
                 {card.rank}
               </span>
-              <span className="text-[0.6rem]">
+              <span className="text-[0.45rem]">
                 {card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}
               </span>
             </div>
@@ -69,7 +70,7 @@ export const CardComponent = memo(function CardComponent({
         <img
           src={src}
           alt={faceDown ? 'Card back' : `${card.rank} of ${card.suit}`}
-          className="w-full h-full object-cover rounded-lg"
+          className="w-full h-full object-cover rounded-md"
           draggable={false}
           onError={() => setImgError(true)}
         />

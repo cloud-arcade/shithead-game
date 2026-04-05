@@ -30,14 +30,20 @@ export function LoadingScreen() {
   }, [dispatch]);
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-zinc-950 to-background">
-      <div className="flex flex-col items-center gap-6">
-        <div className="w-10 h-10 border-[3px] border-white/10 border-t-green-500 rounded-full animate-spin" />
-        <p className="text-sm text-zinc-500 tracking-wide">Loading...</p>
-        <div className="w-48 h-1 bg-zinc-800 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-green-500 transition-all duration-150 ease-out" 
-            style={{ width: `${progress}%` }} 
+    <div className="absolute inset-0 flex items-center justify-center bg-background">
+      <img
+        src="/assets/game-assets/table_and_background_color/bg_1.png"
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover opacity-40"
+        draggable={false}
+      />
+      <div className="relative z-10 flex flex-col items-center gap-4">
+        <div className="w-8 h-8 border-[3px] border-white/10 border-t-gold rounded-full animate-spin" />
+        <p className="text-xs text-white/40 font-medium uppercase tracking-wider">Loading...</p>
+        <div className="w-40 h-1 bg-white/10 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-150 ease-out"
+            style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #c49a2a, #e8c44a)' }}
           />
         </div>
       </div>

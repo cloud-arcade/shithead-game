@@ -2,9 +2,15 @@
  * useShitheadGame — Game state hook for Shithead card game.
  *
  * Connects the pure game engine to the multiplayer transport layer.
- * Each player keeps a local copy of the full game state. Actions are
- * broadcast via the multiplayer postMessage bridge, and every client
- * applies them deterministically to stay in sync.
+ *
+ * Architecture:
+ * - Turn-based actions (play/pickup) carry the FULL resulting state,
+ *   so every player always converges to the exact same truth.
+ * - Swap-phase actions are delta-based (only the swap indices), since
+ *   each player's swaps are independent and commutative.
+ * - sharedGameState (MP_SET_STATE) serves as a fallback for reconnects.
+ * - ALL players sync authoritative state after their own actions (not
+ *   just the host), ensuring smooth guest turns.
  */
 
 import { useReducer, useEffect, useCallback, useRef } from 'react';
@@ -13,6 +19,7 @@ import { useMultiplayerActions } from '../hooks/useMultiplayer';
 import {
   dealCards,
   swapCards,
+  redrawHand,
   startPlaying,
   playCards,
   pickUpPile,
@@ -73,81 +80,97 @@ export function useShitheadGame() {
     endTurn,
     endGame: mpEndGame,
   } = useMultiplayerActions();
-  const lastActionRef = useRef(lastAction);
+
+  // Refs for latest values — prevents stale closure bugs in effects
+  const gameStateRef = useRef(gameState);
+  gameStateRef.current = gameState;
+
+  // Start as null so the first mount processes whatever lastAction exists
+  const lastProcessedRef = useRef<typeof lastAction>(null);
+
+  // Guard: only restore from sharedGameState once (on mount / reconnect)
+  const restoredRef = useRef(false);
+
+  // Guard: prevent double-dealing
+  const dealtRef = useRef(false);
 
   // ── React to multiplayer actions ─────────────────────────
 
   useEffect(() => {
-    if (!lastAction || lastAction === lastActionRef.current) return;
-    lastActionRef.current = lastAction;
+    if (!lastAction || lastAction === lastProcessedRef.current) return;
+    lastProcessedRef.current = lastAction;
+
+    const fromMe = lastAction.senderSocketId === mySocketId;
 
     switch (lastAction.action) {
+      // ── Full-state actions (always carry the authoritative state) ─
+
       case 'DEAL': {
+        // Always apply DEAL — even from self (host may have re-mounted)
         const gs = deserializeState(lastAction.data.gameState as unknown as SerializedGameState);
         localDispatch({ type: 'SET_STATE', state: gs });
         break;
       }
-      case 'SYNC_STATE': {
-        const gs = deserializeState(lastAction.data.gameState as unknown as SerializedGameState);
-        localDispatch({ type: 'SET_STATE', state: gs });
+
+      case 'SYNC_STATE':
+      case 'START_GAME':
+      case 'PLAY_CARDS':
+      case 'PICK_UP_PILE': {
+        // Skip our own — we already applied locally before broadcasting
+        if (fromMe) break;
+        if (lastAction.data.gameState) {
+          const gs = deserializeState(lastAction.data.gameState as unknown as SerializedGameState);
+          localDispatch({ type: 'SET_STATE', state: gs });
+        }
         break;
       }
+
+      // ── Delta action (swap is per-player, independent) ──────────
+
       case 'SWAP_CARDS': {
+        if (fromMe) break; // Already applied locally
         const { socketId, handIndex, faceUpIndex } = lastAction.data as {
           socketId: string;
           handIndex: number;
           faceUpIndex: number;
         };
+        // Use the ref to always get the latest state (no stale closure)
+        const current = gameStateRef.current;
         localDispatch({
           type: 'SET_STATE',
-          state: swapCards(gameState, socketId, handIndex, faceUpIndex),
+          state: swapCards(current, socketId, handIndex, faceUpIndex),
         });
         break;
       }
-      case 'READY_TO_PLAY': {
-        // If all ready messages received, start playing
-        // The host controls this transition
-        break;
-      }
-      case 'PLAY_CARDS': {
-        const { socketId: sid, cardIds } = lastAction.data as {
-          socketId: string;
-          cardIds: string[];
-        };
-        const result = playCards(gameState, sid, cardIds);
-        if (result.success) {
-          localDispatch({ type: 'SET_STATE', state: result.state });
+
+      case 'REDRAW_HAND': {
+        // Redraw carries full state since it modifies the draw pile
+        if (fromMe) break;
+        if (lastAction.data.gameState) {
+          const gs = deserializeState(lastAction.data.gameState as unknown as SerializedGameState);
+          localDispatch({ type: 'SET_STATE', state: gs });
         }
-        break;
-      }
-      case 'PICK_UP_PILE': {
-        const { socketId: sid2 } = lastAction.data as { socketId: string };
-        const result = pickUpPile(gameState, sid2);
-        if (result.success) {
-          localDispatch({ type: 'SET_STATE', state: result.state });
-        }
-        break;
-      }
-      case 'START_GAME': {
-        localDispatch({ type: 'SET_STATE', state: startPlaying(gameState) });
         break;
       }
     }
-  }, [lastAction]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lastAction, mySocketId]);
 
-  // ── Restore from shared state on reconnect ────────────────
+  // ── Restore from shared state on mount / reconnect ────────
 
   useEffect(() => {
+    if (restoredRef.current) return;
     if (sharedGameState && (sharedGameState as Record<string, unknown>).phase) {
       const gs = deserializeState(sharedGameState as unknown as SerializedGameState);
       localDispatch({ type: 'RESTORE', state: gs });
+      restoredRef.current = true;
     }
   }, [sharedGameState]);
 
   // ── Host: Deal cards when game starts ─────────────────────
 
   const deal = useCallback(() => {
-    if (!isHost) return;
+    if (!isHost || dealtRef.current) return;
+    dealtRef.current = true;
 
     const playerInfos = mpPlayers.map((p) => ({
       socketId: p.socketId,
@@ -170,25 +193,48 @@ export function useShitheadGame() {
   const doSwapCards = useCallback(
     (handIndex: number, faceUpIndex: number) => {
       if (!mySocketId || gameState.phase !== 'swapping') return;
+
+      // Apply locally immediately
+      const newState = swapCards(gameState, mySocketId, handIndex, faceUpIndex);
+      localDispatch({ type: 'SET_STATE', state: newState });
+
+      // Delta broadcast — other players apply the swap individually
       sendAction('SWAP_CARDS', { socketId: mySocketId, handIndex, faceUpIndex });
-      localDispatch({
-        type: 'SET_STATE',
-        state: swapCards(gameState, mySocketId, handIndex, faceUpIndex),
-      });
     },
-    [mySocketId, gameState, sendAction]
+    [mySocketId, gameState, sendAction],
   );
+
+  const doRedrawHand = useCallback(() => {
+    if (!mySocketId || gameState.phase !== 'swapping') return;
+
+    const newState = redrawHand(gameState, mySocketId);
+    localDispatch({ type: 'SET_STATE', state: newState });
+
+    // Full-state sync because draw pile changes
+    const serialized = serializeState(newState);
+    sendAction('REDRAW_HAND', {
+      socketId: mySocketId,
+      gameState: serialized as unknown as Record<string, unknown>,
+    });
+    mpSetState(serialized as unknown as Record<string, unknown>);
+  }, [mySocketId, gameState, sendAction, mpSetState]);
 
   const doStartGame = useCallback(() => {
     if (!isHost) return;
-    sendAction('START_GAME', {});
+
     const newState = startPlaying(gameState);
     localDispatch({ type: 'SET_STATE', state: newState });
 
-    // Sync state for all
+    // Full-state sync — all players transition to 'playing'
     const serialized = serializeState(newState);
+    sendAction('START_GAME', { gameState: serialized as unknown as Record<string, unknown> });
     mpSetState(serialized as unknown as Record<string, unknown>);
-  }, [isHost, gameState, sendAction, mpSetState]);
+
+    // Tell the platform whose turn it is
+    if (newState.currentTurn) {
+      endTurn(newState.currentTurn);
+    }
+  }, [isHost, gameState, sendAction, mpSetState, endTurn]);
 
   const doPlayCards = useCallback(
     (cardIds: string[]) => {
@@ -197,18 +243,20 @@ export function useShitheadGame() {
       const result = playCards(gameState, mySocketId, cardIds);
       if (!result.success) return;
 
-      sendAction('PLAY_CARDS', { socketId: mySocketId, cardIds });
       localDispatch({ type: 'SET_STATE', state: result.state });
 
-      // Sync state from host side
-      if (isHost) {
-        const serialized = serializeState(result.state);
-        mpSetState(serialized as unknown as Record<string, unknown>);
-      }
+      // Broadcast FULL state — every player converges
+      const serialized = serializeState(result.state);
+      sendAction('PLAY_CARDS', {
+        socketId: mySocketId,
+        cardIds,
+        gameState: serialized as unknown as Record<string, unknown>,
+      });
+      mpSetState(serialized as unknown as Record<string, unknown>);
 
-      // End turn via multiplayer bridge
-      if (result.state.currentTurn !== mySocketId) {
-        endTurn(result.state.currentTurn ?? undefined);
+      // Notify platform of the turn change
+      if (result.state.currentTurn && result.state.currentTurn !== mySocketId) {
+        endTurn(result.state.currentTurn);
       }
 
       // Check game over
@@ -216,7 +264,7 @@ export function useShitheadGame() {
         mpEndGame();
       }
     },
-    [mySocketId, gameState, sendAction, endTurn, isHost, mpSetState, mpEndGame]
+    [mySocketId, gameState, sendAction, endTurn, mpSetState, mpEndGame],
   );
 
   const doPickUpPile = useCallback(() => {
@@ -225,16 +273,21 @@ export function useShitheadGame() {
     const result = pickUpPile(gameState, mySocketId);
     if (!result.success) return;
 
-    sendAction('PICK_UP_PILE', { socketId: mySocketId });
     localDispatch({ type: 'SET_STATE', state: result.state });
 
-    if (isHost) {
-      const serialized = serializeState(result.state);
-      mpSetState(serialized as unknown as Record<string, unknown>);
-    }
+    // Broadcast FULL state
+    const serialized = serializeState(result.state);
+    sendAction('PICK_UP_PILE', {
+      socketId: mySocketId,
+      gameState: serialized as unknown as Record<string, unknown>,
+    });
+    mpSetState(serialized as unknown as Record<string, unknown>);
 
-    endTurn(result.state.currentTurn ?? undefined);
-  }, [mySocketId, gameState, sendAction, endTurn, isHost, mpSetState]);
+    // Notify platform of the turn change
+    if (result.state.currentTurn) {
+      endTurn(result.state.currentTurn);
+    }
+  }, [mySocketId, gameState, sendAction, endTurn, mpSetState]);
 
   // ── Derived state ─────────────────────────────────────────
 
@@ -256,6 +309,7 @@ export function useShitheadGame() {
     // Actions
     deal,
     doSwapCards,
+    doRedrawHand,
     doStartGame,
     doPlayCards,
     doPickUpPile,
