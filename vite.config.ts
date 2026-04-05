@@ -8,7 +8,7 @@ export default defineConfig(({ command }) => ({
   
   // Base path: empty for dev, repository name for production builds (GitHub Pages)
   // Replace 'cloud-arcade-game-template' with your actual repo name when deploying
-  base: command === 'serve' ? '/' : '/cloud-arcade-game-template/',
+  base: command === 'serve' ? '/' : '/shithead-game/',
 
   resolve: {
     alias: {

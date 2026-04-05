@@ -1,7 +1,7 @@
 {
-  "name": "cloud-arcade-game-template",
+  "name": "shithead-game",
   "version": "1.0.0",
-  "description": "A React + Canvas template for building games that integrate with the CloudArcade platform",
+  "description": "Shithead multiplayer card game for CloudArcade platform",
   "type": "module",
   "scripts": {
     "dev": "vite",

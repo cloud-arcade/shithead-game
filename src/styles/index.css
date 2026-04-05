@@ -23,7 +23,7 @@
   }
 
   #root {
-    @apply w-screen h-screen flex items-center justify-center;
+    @apply w-screen h-screen;
   }
 
   button {
