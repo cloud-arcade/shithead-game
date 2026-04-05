@@ -33,7 +33,7 @@ export function LoadingScreen() {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-background">
       <img
-        src={getAssetPath('assets/game-assets/table_and_background_color/bg_1.png')}
+        src={getAssetPath('assets/game-assets/interface_game/bg_1.png')}
         alt=""
         className="absolute inset-0 w-full h-full object-cover opacity-40"
         draggable={false}

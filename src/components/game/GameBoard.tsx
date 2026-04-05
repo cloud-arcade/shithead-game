@@ -113,8 +113,8 @@ export const GameBoard = memo(function GameBoard({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* ── Upper table area: piles + opponent seats ── */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      {/* ── Upper table area: piles + opponent seats (fits within table image ~70-75%) ── */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ maxHeight: '68%' }}>
         {/* Center pile row */}
         <div className="shrink-0 flex items-center justify-center py-1">
           <PileArea
@@ -160,11 +160,11 @@ export const GameBoard = memo(function GameBoard({
         </div>
       </div>
 
-      {/* ── Bottom area: my cards + action buttons ── */}
+      {/* ── Bottom hand area: player's cards fanned from below ── */}
       {myPlayer && (
-        <div className="shrink-0 max-h-[42%] overflow-hidden">
+        <div className="shrink-0 flex flex-col" style={{ height: '32%' }}>
           {/* Action buttons */}
-          <div className="flex items-center justify-center gap-2 py-1">
+          <div className="flex items-center justify-center gap-2 py-1 shrink-0">
             {isMyTurn && !myPlayer.isFinished && (
               <>
                 <button
@@ -187,8 +187,8 @@ export const GameBoard = memo(function GameBoard({
               <span className="text-[0.55rem] text-red-300 font-medium drop-shadow">No playable cards — pick up!</span>
             )}
           </div>
-          {/* My player area */}
-          <div className="px-2 pb-1">
+          {/* My player area — cards peek up from bottom */}
+          <div className="flex-1 px-2 overflow-visible">
             <PlayerArea
               player={myPlayer}
               isMe

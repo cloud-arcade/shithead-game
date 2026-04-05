@@ -46,18 +46,17 @@ export function GameScreen() {
     <div className="absolute inset-0 overflow-hidden">
       {/* Full-bleed casino background */}
       <img
-        src={getAssetPath('assets/game-assets/table_and_background_color/bg_1.png')}
+        src={getAssetPath('assets/game-assets/interface_game/bg_1.png')}
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
         draggable={false}
       />
 
-      {/* Table PNG overlay — covers top ~88% with gap at bottom revealing bg */}
+      {/* Table PNG - mobile: top-aligned, desktop: bottom-aligned to preserve rounded edge */}
       <img
-        src={getAssetPath('assets/game-assets/table_and_background_color/table_1.png')}
+        src={getAssetPath('assets/game-assets/interface_game/table_1.png')}
         alt=""
-        className="absolute top-0 left-0 w-full object-cover object-top"
-        style={{ height: '88%' }}
+        className="absolute top-0 left-0 w-full h-[95vh] object-cover object-top lg:h-[105vh] lg:object-bottom"
         draggable={false}
       />
 
