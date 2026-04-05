@@ -94,9 +94,9 @@ export const GameBoard = memo(function GameBoard({
   }, [selectedCards, myPlayer, myZone, isMyTurn, gameState.pile]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Opponents area (top) */}
-      <div className="flex justify-center gap-2 sm:gap-4 p-2 flex-wrap">
+      <div className="shrink-0 flex justify-center gap-1 sm:gap-2 p-1 sm:p-2 flex-wrap max-h-[28%] overflow-hidden">
         {opponents.map((p) => (
           <PlayerArea
             key={p.socketId}
@@ -111,7 +111,7 @@ export const GameBoard = memo(function GameBoard({
       </div>
 
       {/* Center: Pile area */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
+      <div className="flex-1 flex flex-col items-center justify-center gap-2 min-h-0 overflow-hidden">
         <PileArea
           pile={gameState.pile}
           drawPileCount={gameState.drawPile.length}
@@ -120,8 +120,8 @@ export const GameBoard = memo(function GameBoard({
 
         {/* Game message */}
         {gameState.lastMessage && (
-          <div className="text-center px-4 py-1.5 bg-black/40 rounded-lg max-w-md">
-            <p className="text-xs sm:text-sm text-zinc-300">{gameState.lastMessage}</p>
+          <div className="text-center px-3 py-1 bg-black/40 rounded-lg max-w-md">
+            <p className="text-[0.65rem] sm:text-xs text-zinc-300">{gameState.lastMessage}</p>
           </div>
         )}
 
@@ -146,13 +146,13 @@ export const GameBoard = memo(function GameBoard({
         )}
 
         {isMyTurn && !canIPlay && myZone !== 'faceDown' && myZone !== null && (
-          <p className="text-xs text-red-400">No playable cards — pick up the pile!</p>
+          <p className="text-[0.6rem] sm:text-xs text-red-400">No playable cards — pick up the pile!</p>
         )}
       </div>
 
       {/* My area (bottom) */}
       {myPlayer && (
-        <div className="p-2 border-t border-white/5 bg-black/20">
+        <div className="shrink-0 p-1 sm:p-2 border-t border-white/5 bg-black/20 max-h-[40%] overflow-hidden">
           <PlayerArea
             player={myPlayer}
             isMe

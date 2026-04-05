@@ -56,7 +56,7 @@ export function GameScreen() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-hidden">
         {/* Waiting for deal */}
         {gameState.phase === 'waiting' && (
           <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -96,7 +96,9 @@ export function GameScreen() {
 
         {/* Game over */}
         {gameState.phase === 'finished' && (
-          <GameOverView gameState={gameState} mySocketId={mySocketId} />
+          <div className="flex items-center justify-center h-full">
+            <GameOverView gameState={gameState} mySocketId={mySocketId} />
+          </div>
         )}
       </div>
     </div>

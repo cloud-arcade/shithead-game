@@ -17,10 +17,10 @@ export const PileArea = memo(function PileArea({ pile, drawPileCount, burnedCoun
   const secondCard = pile.length > 1 ? pile[pile.length - 2] : null;
 
   return (
-    <div className="flex items-center justify-center gap-6 sm:gap-10">
+    <div className="flex items-center justify-center gap-4 sm:gap-6 md:gap-10">
       {/* Draw pile */}
-      <div className="flex flex-col items-center gap-1">
-        <div className="relative w-16 h-[5.6rem] sm:w-20 sm:h-[7rem]">
+      <div className="flex flex-col items-center gap-0.5">
+        <div className="relative w-11 h-[3.85rem] sm:w-14 sm:h-[4.9rem] md:w-16 md:h-[5.6rem] lg:w-20 lg:h-[7rem]">
           {drawPileCount > 0 ? (
             <>
               {/* Stack effect */}
@@ -41,18 +41,18 @@ export const PileArea = memo(function PileArea({ pile, drawPileCount, burnedCoun
             </>
           ) : (
             <div className="w-full h-full rounded-lg border-2 border-dashed border-white/10 flex items-center justify-center">
-              <span className="text-zinc-600 text-xs">Empty</span>
+              <span className="text-zinc-600 text-[0.6rem]">Empty</span>
             </div>
           )}
         </div>
-        <span className="text-[0.6rem] text-zinc-500 uppercase tracking-wider">
+        <span className="text-[0.5rem] sm:text-[0.6rem] text-zinc-500 uppercase tracking-wider">
           Draw ({drawPileCount})
         </span>
       </div>
 
       {/* Discard pile */}
-      <div className="flex flex-col items-center gap-1">
-        <div className="relative w-16 h-[5.6rem] sm:w-20 sm:h-[7rem]">
+      <div className="flex flex-col items-center gap-0.5">
+        <div className="relative w-11 h-[3.85rem] sm:w-14 sm:h-[4.9rem] md:w-16 md:h-[5.6rem] lg:w-20 lg:h-[7rem]">
           {topCard ? (
             <>
               {/* Second card peeking underneath */}
@@ -65,28 +65,28 @@ export const PileArea = memo(function PileArea({ pile, drawPileCount, burnedCoun
                 <CardComponent card={topCard} disabled />
               </div>
               {/* Pile count badge */}
-              <div className="absolute -top-1 -right-1 bg-zinc-800 border border-zinc-600 text-white text-[0.55rem] font-bold rounded-full w-5 h-5 flex items-center justify-center z-10">
+              <div className="absolute -top-1 -right-1 bg-zinc-800 border border-zinc-600 text-white text-[0.5rem] font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center z-10">
                 {pile.length}
               </div>
             </>
           ) : (
             <div className="w-full h-full rounded-lg border-2 border-dashed border-white/10 flex items-center justify-center">
-              <span className="text-zinc-600 text-xs">Empty</span>
+              <span className="text-zinc-600 text-[0.6rem]">Empty</span>
             </div>
           )}
         </div>
-        <span className="text-[0.6rem] text-zinc-500 uppercase tracking-wider">
+        <span className="text-[0.5rem] sm:text-[0.6rem] text-zinc-500 uppercase tracking-wider">
           Pile ({pile.length})
         </span>
       </div>
 
       {/* Burned count indicator */}
       {burnedCount > 0 && (
-        <div className="flex flex-col items-center gap-1">
-          <div className="w-16 h-[5.6rem] sm:w-20 sm:h-[7rem] rounded-lg bg-orange-900/20 border border-orange-600/20 flex items-center justify-center">
-            <span className="text-2xl">🔥</span>
+        <div className="flex flex-col items-center gap-0.5">
+          <div className="w-11 h-[3.85rem] sm:w-14 sm:h-[4.9rem] md:w-16 md:h-[5.6rem] lg:w-20 lg:h-[7rem] rounded-lg bg-orange-900/20 border border-orange-600/20 flex items-center justify-center">
+            <span className="text-lg sm:text-2xl">🔥</span>
           </div>
-          <span className="text-[0.6rem] text-zinc-500 uppercase tracking-wider">
+          <span className="text-[0.5rem] sm:text-[0.6rem] text-zinc-500 uppercase tracking-wider">
             Burned ({burnedCount})
           </span>
         </div>

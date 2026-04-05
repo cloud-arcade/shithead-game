@@ -20,15 +20,15 @@ export function MenuScreen() {
   };
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-zinc-950 via-zinc-900 to-background overflow-auto">
-      <div className="flex flex-col items-center gap-6 text-center p-6 max-w-md w-full">
+    <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-zinc-950 via-zinc-900 to-background overflow-y-auto scrollbar-hide">
+      <div className="flex flex-col items-center gap-4 sm:gap-6 text-center p-4 sm:p-6 max-w-md w-full">
         {/* Logo / Title */}
         <div>
-          <p className="text-5xl mb-2">🃏</p>
-          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-yellow-300 via-red-400 to-pink-500 bg-clip-text text-transparent">
+          <p className="text-3xl sm:text-5xl mb-1 sm:mb-2">🃏</p>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight bg-gradient-to-r from-yellow-300 via-red-400 to-pink-500 bg-clip-text text-transparent">
             Shithead
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">The Classic Card Game</p>
+          <p className="text-xs sm:text-sm text-zinc-500 mt-1">The Classic Card Game</p>
         </div>
 
         {/* Player list */}

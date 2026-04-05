@@ -29,25 +29,25 @@ export const GameOverView = memo(function GameOverView({ gameState, mySocketId }
   });
 
   return (
-    <div className="flex flex-col items-center justify-center gap-6 p-6 text-center">
+    <div className="flex flex-col items-center justify-center gap-4 sm:gap-6 p-4 sm:p-6 text-center max-h-full overflow-hidden">
       {/* Title */}
       <div>
         {iAmShithead ? (
           <>
-            <p className="text-5xl mb-2">💩</p>
-            <h1 className="text-3xl font-bold text-red-400">You're the Shithead!</h1>
-            <p className="text-sm text-zinc-400 mt-1">Better luck next time...</p>
+            <p className="text-3xl sm:text-5xl mb-1 sm:mb-2">💩</p>
+            <h1 className="text-xl sm:text-3xl font-bold text-red-400">You're the Shithead!</h1>
+            <p className="text-xs text-zinc-400 mt-1">Better luck next time...</p>
           </>
         ) : iAmWinner ? (
           <>
-            <p className="text-5xl mb-2">🏆</p>
-            <h1 className="text-3xl font-bold text-yellow-300">You Won!</h1>
-            <p className="text-sm text-zinc-400 mt-1">First to empty all cards!</p>
+            <p className="text-3xl sm:text-5xl mb-1 sm:mb-2">🏆</p>
+            <h1 className="text-xl sm:text-3xl font-bold text-yellow-300">You Won!</h1>
+            <p className="text-xs text-zinc-400 mt-1">First to empty all cards!</p>
           </>
         ) : (
           <>
-            <p className="text-5xl mb-2">🎮</p>
-            <h1 className="text-3xl font-bold text-white">Game Over!</h1>
+            <p className="text-3xl sm:text-5xl mb-1 sm:mb-2">🎮</p>
+            <h1 className="text-xl sm:text-3xl font-bold text-white">Game Over!</h1>
           </>
         )}
       </div>

@@ -31,7 +31,7 @@ export const PlayerArea = memo(function PlayerArea({
   return (
     <div
       className={`
-        relative flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300
+        relative flex flex-col items-center gap-0.5 p-1 sm:p-2 rounded-xl transition-all duration-300
         ${isCurrentTurn ? 'ring-2 ring-yellow-400/60 bg-yellow-400/5' : ''}
         ${player.isFinished ? 'opacity-50' : ''}
       `}
@@ -56,7 +56,7 @@ export const PlayerArea = memo(function PlayerArea({
 
       {/* Table cards (face-down + face-up stacked) */}
       {(player.cards.faceDown.length > 0 || player.cards.faceUp.length > 0) && (
-        <div className="flex gap-1 items-end">
+        <div className="flex gap-0.5 sm:gap-1 items-end">
           {Array.from({ length: Math.max(player.cards.faceDown.length, player.cards.faceUp.length) }).map((_, i) => {
             const faceDownCard = player.cards.faceDown[i];
             const faceUpCard = player.cards.faceUp[i];
@@ -96,25 +96,27 @@ export const PlayerArea = memo(function PlayerArea({
 
       {/* Hand cards (only visible to the player themselves) */}
       {isMe && player.cards.hand.length > 0 && (
-        <div className="flex flex-wrap justify-center gap-0.5 mt-1">
-          {player.cards.hand.map((card) => {
-            const isPlayable = isCurrentTurn && playableZone === 'hand';
-            return (
-              <CardComponent
-                key={card.id}
-                card={card}
-                selected={selectedCardIds.has(card.id)}
-                disabled={!isPlayable}
-                onClick={isPlayable ? () => onCardClick?.(card.id) : undefined}
-              />
-            );
-          })}
+        <div className="flex justify-center overflow-x-auto scrollbar-hide mt-0.5 pb-1 max-w-full">
+          <div className="flex" style={{ gap: player.cards.hand.length > 7 ? '-0.5rem' : '0.125rem' }}>
+            {player.cards.hand.map((card) => {
+              const isPlayable = isCurrentTurn && playableZone === 'hand';
+              return (
+                <CardComponent
+                  key={card.id}
+                  card={card}
+                  selected={selectedCardIds.has(card.id)}
+                  disabled={!isPlayable}
+                  onClick={isPlayable ? () => onCardClick?.(card.id) : undefined}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
 
       {/* For opponents: show hand count */}
       {!isMe && player.cards.hand.length > 0 && (
-        <div className="flex gap-0.5 mt-1">
+        <div className="flex -space-x-3 mt-0.5">
           {player.cards.hand.map((card) => (
             <CardComponent
               key={card.id}

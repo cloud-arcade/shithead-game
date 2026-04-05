@@ -28,7 +28,9 @@ export const CardComponent = memo(function CardComponent({
   const [imgError, setImgError] = useState(false);
   const src = faceDown ? getCardBackImagePath() : getCardImagePath(card);
 
-  const sizeClass = small ? 'w-12 h-[4.2rem] sm:w-14 sm:h-[4.9rem]' : 'w-16 h-[5.6rem] sm:w-20 sm:h-[7rem]';
+  const sizeClass = small
+    ? 'w-8 h-[2.8rem] sm:w-10 sm:h-[3.5rem] md:w-12 md:h-[4.2rem] lg:w-14 lg:h-[4.9rem]'
+    : 'w-11 h-[3.85rem] sm:w-14 sm:h-[4.9rem] md:w-16 md:h-[5.6rem] lg:w-20 lg:h-[7rem]';
 
   return (
     <button
@@ -39,7 +41,7 @@ export const CardComponent = memo(function CardComponent({
         relative rounded-lg overflow-hidden transition-all duration-200 ease-out
         ${sizeClass}
         ${!disabled && onClick ? 'cursor-pointer hover:brightness-110 active:scale-95' : 'cursor-default'}
-        ${selected ? '-translate-y-3 ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : ''}
+        ${selected ? '-translate-y-2 ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : ''}
         ${disabled ? 'opacity-60' : ''}
         ${className}
       `}
