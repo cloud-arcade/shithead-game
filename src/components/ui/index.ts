@@ -1,3 +1,12 @@
 export { Button } from './Button';
 export { HUD } from './HUD';
 export { PauseOverlay } from './PauseOverlay';
+export { TurnTimer } from './TurnTimer';
+export { SessionRestoreModal } from './SessionRestoreModal';
+export { DisconnectOverlay } from './DisconnectOverlay';
+export { GameHeader } from './GameHeader';
+export { TableCorners } from './TableCorners';
+export { RulesPanel } from './RulesPanel';
+export { HistoryPanel } from './HistoryPanel';
+export type { GameLogEntry } from './HistoryPanel';
+export { GameLayout } from './GameLayout';

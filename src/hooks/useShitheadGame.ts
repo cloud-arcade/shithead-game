@@ -4,13 +4,11 @@
  * Connects the pure game engine to the multiplayer transport layer.
  *
  * Architecture:
- * - Turn-based actions (play/pickup) carry the FULL resulting state,
- *   so every player always converges to the exact same truth.
- * - Swap-phase actions are delta-based (only the swap indices), since
- *   each player's swaps are independent and commutative.
- * - sharedGameState (MP_SET_STATE) serves as a fallback for reconnects.
- * - ALL players sync authoritative state after their own actions (not
- *   just the host), ensuring smooth guest turns.
+ * - Turn-based actions carry FULL resulting state for convergence.
+ * - Swap-phase actions are delta-based (independent, commutative).
+ * - Turn timer: 30s per turn, auto-plays on timeout.
+ * - AFK detection: 3 consecutive timeouts = auto-forfeit.
+ * - Disconnect guard: 30s grace period for disconnected players.
  */
 
 import { useReducer, useEffect, useCallback, useRef } from 'react';
@@ -23,6 +21,9 @@ import {
   startPlaying,
   playCards,
   pickUpPile,
+  endPlayerTurn,
+  autoPlayForTimeout,
+  forfeitPlayer,
   serializeState,
   deserializeState,
   hasPlayableCard,
@@ -50,6 +51,10 @@ const INITIAL: ShitheadGameState = {
   finishOrder: [],
   lastMessage: null,
   lastActionTime: 0,
+  turnStartTime: 0,
+  consecutiveTimeouts: {},
+  turnPlayedRank: null,
+  goAgain: false,
 };
 
 function reducer(_state: ShitheadGameState, action: LocalAction): ShitheadGameState {
@@ -115,7 +120,10 @@ export function useShitheadGame() {
       case 'SYNC_STATE':
       case 'START_GAME':
       case 'PLAY_CARDS':
-      case 'PICK_UP_PILE': {
+      case 'PICK_UP_PILE':
+      case 'END_TURN':
+      case 'PLAYER_TIMEOUT':
+      case 'PLAYER_FORFEIT': {
         // Skip our own — we already applied locally before broadcasting
         if (fromMe) break;
         if (lastAction.data.gameState) {
@@ -289,6 +297,110 @@ export function useShitheadGame() {
     }
   }, [mySocketId, gameState, sendAction, endTurn, mpSetState]);
 
+  // ── End Turn Explicitly ────────────────────────────────────
+
+  const doEndTurn = useCallback(() => {
+    if (!mySocketId || gameState.currentTurn !== mySocketId || gameState.phase !== 'playing') return;
+
+    const result = endPlayerTurn(gameState, mySocketId);
+    if (!result.success) return;
+
+    localDispatch({ type: 'SET_STATE', state: result.state });
+
+    // Broadcast FULL state
+    const serialized = serializeState(result.state);
+    sendAction('END_TURN', {
+      socketId: mySocketId,
+      gameState: serialized as unknown as Record<string, unknown>,
+    });
+    mpSetState(serialized as unknown as Record<string, unknown>);
+
+    // Notify platform of the turn change
+    if (result.state.currentTurn) {
+      endTurn(result.state.currentTurn);
+    }
+  }, [mySocketId, gameState, sendAction, endTurn, mpSetState]);
+
+  // ── Auto-play on timeout (called by turn timer) ───────────
+
+  const doAutoPlay = useCallback(() => {
+    if (!mySocketId || gameState.currentTurn !== mySocketId || gameState.phase !== 'playing') return;
+
+    const result = autoPlayForTimeout(gameState, mySocketId);
+    if (!result.success) return;
+
+    // Increment consecutive timeout counter
+    let newState = result.state;
+    const timeouts = { ...(newState.consecutiveTimeouts || {}) };
+    timeouts[mySocketId] = (timeouts[mySocketId] || 0) + 1;
+    newState = { ...newState, consecutiveTimeouts: timeouts };
+
+    // Adjust last message
+    const playerName = newState.players.find((p) => p.socketId === mySocketId)?.displayName ?? 'Player';
+    newState = {
+      ...newState,
+      lastMessage: `⏰ ${playerName} ran out of time! Auto-played. (${timeouts[mySocketId]}/3 warnings)`,
+    };
+
+    localDispatch({ type: 'SET_STATE', state: newState });
+    const serialized = serializeState(newState);
+    sendAction('PLAYER_TIMEOUT', {
+      socketId: mySocketId,
+      gameState: serialized as unknown as Record<string, unknown>,
+    });
+    mpSetState(serialized as unknown as Record<string, unknown>);
+
+    // 3 consecutive timeouts → auto-forfeit
+    if (timeouts[mySocketId] >= 3) {
+      // Small delay so the timeout state syncs first
+      setTimeout(() => {
+        const currentGS = gameStateRef.current;
+        const forfeitState = forfeitPlayer(currentGS, mySocketId);
+        localDispatch({ type: 'SET_STATE', state: forfeitState });
+        const fSerialized = serializeState(forfeitState);
+        sendAction('PLAYER_FORFEIT', {
+          socketId: mySocketId,
+          gameState: fSerialized as unknown as Record<string, unknown>,
+        });
+        mpSetState(fSerialized as unknown as Record<string, unknown>);
+        if (forfeitState.phase === 'finished') mpEndGame();
+      }, 1000);
+    } else if (newState.currentTurn && newState.currentTurn !== mySocketId) {
+      endTurn(newState.currentTurn);
+    }
+  }, [mySocketId, gameState, sendAction, mpSetState, endTurn, mpEndGame]);
+
+  // ── Forfeit a disconnected player (called by disconnect guard) ─
+
+  const doForfeitPlayer = useCallback(
+    (socketId: string) => {
+      if (gameState.phase !== 'playing') return;
+      const newState = forfeitPlayer(gameState, socketId);
+      localDispatch({ type: 'SET_STATE', state: newState });
+      const serialized = serializeState(newState);
+      sendAction('PLAYER_FORFEIT', {
+        socketId,
+        gameState: serialized as unknown as Record<string, unknown>,
+      });
+      mpSetState(serialized as unknown as Record<string, unknown>);
+      if (newState.phase === 'finished') mpEndGame();
+      else if (newState.currentTurn) endTurn(newState.currentTurn);
+    },
+    [gameState, sendAction, mpSetState, endTurn, mpEndGame],
+  );
+
+  // ── Restore from session storage (fallback) ───────────────
+
+  const restoreFromSession = useCallback(
+    (savedState: ShitheadGameState) => {
+      localDispatch({ type: 'RESTORE', state: savedState });
+      restoredRef.current = true;
+      const serialized = serializeState(savedState);
+      mpSetState(serialized as unknown as Record<string, unknown>);
+    },
+    [mpSetState],
+  );
+
   // ── Derived state ─────────────────────────────────────────
 
   const myPlayer = gameState.players.find((p) => p.socketId === mySocketId) ?? null;
@@ -313,5 +425,9 @@ export function useShitheadGame() {
     doStartGame,
     doPlayCards,
     doPickUpPile,
+    doEndTurn,
+    doAutoPlay,
+    doForfeitPlayer,
+    restoreFromSession,
   };
 }

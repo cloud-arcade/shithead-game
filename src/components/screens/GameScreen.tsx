@@ -1,16 +1,29 @@
 /**
- * Game Screen — Main Shithead gameplay screen
- * Renders the appropriate phase: swapping, playing, or finished.
+ * GameScreen — Main Shithead gameplay screen.
+ *
+ * Integrates:
+ * - Game phases (waiting → swapping → playing → finished)
+ * - Turn timer (30s per turn, auto-play on timeout)
+ * - Disconnect guard (30s grace for disconnected opponents)
+ * - Session persistence (save/restore across refresh)
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useShitheadGame } from '../../hooks/useShitheadGame';
 import { useMultiplayerState } from '../../context/MultiplayerContext';
+import { useTurnTimer } from '../../hooks/useTurnTimer';
+import { useDisconnectGuard } from '../../hooks/useDisconnectGuard';
+import { useSessionPersistence } from '../../hooks/useSessionPersistence';
 import { requestFullscreenLandscape, exitFullscreenLandscape } from '../../platform/fullscreen';
-import { getAssetPath } from '../../game/engine';
 import { SwapPhase } from '../game/SwapPhase';
 import { GameBoard } from '../game/GameBoard';
 import { GameOverView } from '../game/GameOverView';
+import { DisconnectOverlay, GameLayout } from '../ui';
+
+interface LogEntry {
+  message: string;
+  time: number;
+}
 
 export function GameScreen() {
   const {
@@ -25,111 +38,115 @@ export function GameScreen() {
     doStartGame,
     doPlayCards,
     doPickUpPile,
+    doEndTurn,
+    doAutoPlay,
+    doForfeitPlayer,
   } = useShitheadGame();
 
   const mp = useMultiplayerState();
 
-  // Force fullscreen landscape while game is active
+  // ── Game Log State (for desktop side panel) ────────
+  const [gameLog, setGameLog] = useState<LogEntry[]>([]);
+  const handleLogUpdate = useCallback((entries: LogEntry[]) => {
+    setGameLog(entries);
+  }, []);
+
+  // ── Session Persistence ────────────────────────────
+  useSessionPersistence(gameState, mySocketId);
+
+  // ── Turn Timer ─────────────────────────────────────
+  const turnTimer = useTurnTimer({
+    turnStartTime: gameState.turnStartTime,
+    isMyTurn,
+    isPlaying: gameState.phase === 'playing',
+    currentTurn: gameState.currentTurn,
+    onTimeout: doAutoPlay,
+  });
+
+  // ── Disconnect Guard ───────────────────────────────
+  const { disconnectedPlayers } = useDisconnectGuard({
+    players: mp.players,
+    mySocketId,
+    isPlaying:
+      gameState.phase === 'playing' || gameState.phase === 'swapping',
+    onForfeit: doForfeitPlayer,
+  });
+
+  // ── Force fullscreen landscape ─────────────────────
   useEffect(() => {
     requestFullscreenLandscape();
     return () => exitFullscreenLandscape();
   }, []);
 
-  // Host auto-deals when the game screen mounts with enough players
+  // ── Host auto-deals when screen mounts ─────────────
   useEffect(() => {
-    if (gameState.phase === 'waiting' && isHost && mp.players.length >= 2) {
+    if (
+      gameState.phase === 'waiting' &&
+      isHost &&
+      mp.players.length >= 2
+    ) {
       deal();
     }
   }, [gameState.phase, isHost, mp.players.length, deal]);
 
   return (
-    <div className="absolute inset-0 overflow-hidden">
-      {/* Full-bleed casino background */}
-      <img
-        src={getAssetPath('assets/game-assets/interface_game/bg_1.png')}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover"
-        draggable={false}
-      />
+    <div className="game-screen">
+      {/* Disconnect overlay (absolutely positioned, on top) */}
+      <DisconnectOverlay disconnectedPlayers={disconnectedPlayers} />
 
-      {/* Table PNG - full screen height, preserve rounded edge on desktop */}
-      <img
-        src={getAssetPath('assets/game-assets/interface_game/table_1.png')}
-        alt=""
-        className="absolute top-0 left-0 w-full h-screen object-cover object-top lg:object-bottom"
-        draggable={false}
-      />
-
-      {/* Content layer */}
-      <div className="relative z-10 flex flex-col h-full">
-        {/* Slim top HUD bar */}
-        <div className="flex items-center justify-between px-3 py-1 shrink-0"
-          style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 100%)' }}
-        >
-          <span className="text-[0.6rem] font-bold text-gold-light uppercase tracking-widest drop-shadow">Shithead</span>
-          <div className="flex items-center gap-2 text-[0.5rem] font-semibold">
-            {gameState.phase !== 'waiting' && (
-              <>
-                <span className="text-white/50">Draw {gameState.drawPile.length}</span>
-                <span className="text-white/20">|</span>
-                <span className="text-white/50">Pile {gameState.pile.length}</span>
-                <span className="text-white/20">|</span>
-              </>
-            )}
-            <span className={`uppercase tracking-wider font-bold ${
-              gameState.phase === 'playing' ? 'text-green-400' :
-              gameState.phase === 'finished' ? 'text-red-400' :
-              'text-gold'
-            }`}>
-              {gameState.phase}
-            </span>
-          </div>
-        </div>
-
-        {/* Main content area */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {/* Waiting for deal */}
-          {gameState.phase === 'waiting' && (
-            <div className="flex flex-col items-center justify-center h-full gap-3">
-              <div className="w-8 h-8 border-[3px] border-white/10 border-t-gold rounded-full animate-spin" />
-              <p className="text-xs text-white/70 font-medium drop-shadow">
+      <GameLayout gameLog={gameLog}>
+        {/* Waiting for deal */}
+        {gameState.phase === 'waiting' && (
+          <div className="game-table">
+            <div className="waiting-screen">
+              <div className="spinner" />
+              <p
+                style={{
+                  fontSize: '0.7rem',
+                  color: 'rgba(255,255,255,0.55)',
+                  fontWeight: 500,
+                }}
+              >
                 {mp.players.length < 2
-                  ? 'Waiting for more players...'
+                  ? 'Waiting for players…'
                   : isHost
-                  ? 'Dealing cards...'
-                  : 'Waiting for host to deal...'}
+                  ? 'Dealing cards…'
+                  : 'Waiting for host to deal…'}
               </p>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Swap phase */}
-          {gameState.phase === 'swapping' && myPlayer && (
-            <SwapPhase
-              myPlayer={myPlayer}
-              isHost={isHost}
-              onSwap={doSwapCards}
-              onRedraw={doRedrawHand}
-              onReady={doStartGame}
-            />
-          )}
+        {/* Swap phase */}
+        {gameState.phase === 'swapping' && myPlayer && (
+          <SwapPhase
+            myPlayer={myPlayer}
+            isHost={isHost}
+            onSwap={doSwapCards}
+            onRedraw={doRedrawHand}
+            onReady={doStartGame}
+          />
+        )}
 
-          {/* Playing phase */}
-          {gameState.phase === 'playing' && (
-            <GameBoard
-              gameState={gameState}
-              mySocketId={mySocketId}
-              isMyTurn={isMyTurn}
-              onPlayCards={doPlayCards}
-              onPickUpPile={doPickUpPile}
-            />
-          )}
+        {/* Playing phase */}
+        {gameState.phase === 'playing' && (
+          <GameBoard
+            gameState={gameState}
+            mySocketId={mySocketId}
+            isMyTurn={isMyTurn}
+            onPlayCards={doPlayCards}
+            onPickUpPile={doPickUpPile}
+            onEndTurn={doEndTurn}
+            onLogUpdate={handleLogUpdate}
+            turnTimer={turnTimer}
+          />
+        )}
 
-          {/* Game over */}
-          {gameState.phase === 'finished' && (
-            <GameOverView gameState={gameState} mySocketId={mySocketId} />
-          )}
-        </div>
-      </div>
+        {/* Game over */}
+        {gameState.phase === 'finished' && (
+          <GameOverView gameState={gameState} mySocketId={mySocketId} />
+        )}
+      </GameLayout>
     </div>
   );
 }

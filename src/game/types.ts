@@ -71,6 +71,14 @@ export interface ShitheadGameState {
   lastMessage: string | null;
   /** Timestamp of last action for animation timing */
   lastActionTime: number;
+  /** Timestamp when the current turn started (for turn timer) */
+  turnStartTime: number;
+  /** Consecutive timeout count per player (3 = auto-forfeit) */
+  consecutiveTimeouts: Record<string, number>;
+  /** Rank of cards played this turn - can only play same rank unless go-again */
+  turnPlayedRank: Rank | null;
+  /** If true, player can play any valid card (5/burn triggered go-again) */
+  goAgain: boolean;
 }
 
 // ── Game Actions (sent via multiplayer) ─────────────────────
@@ -83,7 +91,11 @@ export type ShitheadAction =
   | { action: 'PLAY_CARDS'; data: { cardIds: string[] } }
   | { action: 'PLAY_FACE_DOWN'; data: { cardIndex: number } }
   | { action: 'PICK_UP_PILE'; data: Record<string, never> }
-  | { action: 'SYNC_STATE'; data: { gameState: SerializedGameState } };
+  | { action: 'SYNC_STATE'; data: { gameState: SerializedGameState } }
+  | { action: 'PLAYER_TIMEOUT'; data: { socketId: string; gameState: SerializedGameState } }
+  | { action: 'PLAYER_FORFEIT'; data: { socketId: string; gameState: SerializedGameState } }
+  | { action: 'PLAYER_DISCONNECTING'; data: { socketId: string } }
+  | { action: 'PLAYER_RECONNECTED'; data: { socketId: string } };
 
 // ── Serialized state (for multiplayer sync) ─────────────────
 
@@ -123,4 +135,6 @@ export interface SerializedGameState {
   finishOrder: string[];
   lastMessage: string | null;
   lastActionTime: number;
+  turnStartTime: number;
+  consecutiveTimeouts: Record<string, number>;
 }

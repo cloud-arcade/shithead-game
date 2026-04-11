@@ -8,6 +8,7 @@ import { MultiplayerProvider } from './context/MultiplayerContext';
 import { GameContainer } from './components/GameContainer';
 import { useCloudArcade } from './hooks/useCloudArcade';
 import { useMultiplayer } from './hooks/useMultiplayer';
+import { useTestMode } from './hooks/useTestMode';
 
 function AppContent() {
   // Initialize CloudArcade platform integration (single-player messages)
@@ -15,6 +16,10 @@ function AppContent() {
 
   // Initialize multiplayer postMessage bridge
   useMultiplayer({ debug: import.meta.env.DEV });
+
+  // Local test mode — simulates multiplayer with an AI opponent.
+  // Only active when VITE_TEST_MODE=true in .env.local (gitignored).
+  useTestMode();
 
   return <GameContainer />;
 }

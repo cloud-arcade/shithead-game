@@ -26,8 +26,12 @@ const RANK_VALUE: Record<Rank, number> = {
 };
 
 /** Special cards */
-const RESET_RANK: Rank = '2';   // Resets pile — next player can play anything
-const BURN_RANK: Rank = '10';   // Burns the pile — player goes again
+const RESET_RANK: Rank = '2';   // Can play on anything, resets pile — any card can be played next
+const GLASS_RANK: Rank = '3';   // Invisible/glass card — acts as if it wasn't played
+const GO_AGAIN_RANK: Rank = '5'; // Your go again after playing
+const LOWER_RANK: Rank = '7';   // Next card must be 7 or lower (except 2, 10)
+const SKIP_RANK: Rank = '8';    // Skips the next player (2+ players)
+const BURN_RANK: Rank = '10';   // Burns the pile — player goes again (cannot be played on 7)
 
 // ── Deck Creation & Shuffling ───────────────────────────────
 
@@ -56,17 +60,51 @@ export function getRankValue(rank: Rank): number {
   return RANK_VALUE[rank];
 }
 
-export function canPlayOnPile(card: Card, pile: Card[]): boolean {
-  // 2 and 10 can always be played
-  if (card.rank === RESET_RANK || card.rank === BURN_RANK) return true;
+/**
+ * Get the effective top card of the pile, looking through glass (3) cards.
+ * Returns null if pile is empty or all glass cards.
+ */
+export function getEffectiveTopCard(pile: Card[]): Card | null {
+  if (pile.length === 0) return null;
+  
+  // Walk backwards through pile, skipping glass cards
+  for (let i = pile.length - 1; i >= 0; i--) {
+    if (pile[i].rank !== GLASS_RANK) {
+      return pile[i];
+    }
+  }
+  // All cards are glass — treat as empty pile
+  return null;
+}
 
+export function canPlayOnPile(card: Card, pile: Card[]): boolean {
   // Empty pile — anything goes
   if (pile.length === 0) return true;
 
-  // Find the effective top card (skip transparent 9s — house rule NOT enabled for simplicity)
-  const topCard = pile[pile.length - 1];
+  // 2 (reset) can always be played on anything
+  if (card.rank === RESET_RANK) return true;
+  
+  // 3 (glass) can always be played — it's invisible  
+  if (card.rank === GLASS_RANK) return true;
 
-  return getRankValue(card.rank) >= getRankValue(topCard.rank);
+  // Get the effective top card (looking through glass cards)
+  const effectiveTop = getEffectiveTopCard(pile);
+  
+  // If pile is all glass cards, treat as empty — anything goes
+  if (!effectiveTop) return true;
+  
+  // 7 rule: if effective top is 7, next card must be 7 or lower
+  // Exception: 2 (reset) and 3 (glass) can still be played (handled above)
+  // Note: 10 (burn) CANNOT be played on 7 either
+  if (effectiveTop.rank === LOWER_RANK) {
+    return getRankValue(card.rank) <= getRankValue(LOWER_RANK);
+  }
+
+  // 10 (burn) can be played on anything (except 7 - handled above)
+  if (card.rank === BURN_RANK) return true;
+
+  // Normal rule: card must be >= top card value
+  return getRankValue(card.rank) >= getRankValue(effectiveTop.rank);
 }
 
 /** Check if the top 4 cards of the pile are the same rank → burn */
@@ -123,6 +161,10 @@ export function dealCards(
     finishOrder: [],
     lastMessage: 'Swap cards between your hand and face-up cards, then click Ready!',
     lastActionTime: Date.now(),
+    turnStartTime: Date.now(),
+    consecutiveTimeouts: {},
+    turnPlayedRank: null,
+    goAgain: false,
   };
 }
 
@@ -199,6 +241,7 @@ export function startPlaying(state: ShitheadGameState): ShitheadGameState {
     phase: 'playing',
     lastMessage: `Game started! ${getPlayerName(state, state.currentTurn)}'s turn.`,
     lastActionTime: Date.now(),
+    turnStartTime: Date.now(),
   };
 }
 
@@ -245,6 +288,20 @@ export function playCards(
     return { state, success: false, message: 'All played cards must be the same rank.' };
   }
 
+  const playedRank = cards[0].rank;
+
+  // Check if player can play this turn:
+  // 1. If goAgain is true, any valid card is OK
+  // 2. If turnPlayedRank is null (first play this turn), any valid card is OK
+  // 3. Otherwise, must match turnPlayedRank (adding more of same rank)
+  if (!state.goAgain && state.turnPlayedRank !== null && playedRank !== state.turnPlayedRank) {
+    return { 
+      state, 
+      success: false, 
+      message: `You can only play more ${state.turnPlayedRank}s or end your turn.` 
+    };
+  }
+
   // Check if cards can be played on the pile
   if (!canPlayOnPile(cards[0], state.pile)) {
     // If playing face-down cards, they must pick up the pile + the card
@@ -260,9 +317,22 @@ export function playCards(
   // Add cards to the pile
   newState = { ...newState, pile: [...newState.pile, ...cards] };
 
-  // Check for burn (10 played or 4-of-a-kind)
-  const isBurn = cards[0].rank === BURN_RANK || shouldBurnPile(newState.pile);
-  const isReset = cards[0].rank === RESET_RANK;
+  // Check for special cards
+  const isBurn = playedRank === BURN_RANK || shouldBurnPile(newState.pile);
+  const isGoAgain = playedRank === GO_AGAIN_RANK;  // 5 = go again
+  const isReset = playedRank === RESET_RANK;       // 2 = reset
+  const isGlass = playedRank === GLASS_RANK;       // 3 = glass (check effective top for go-again)
+  const isSkip = playedRank === SKIP_RANK;         // 8 = skip next player
+  
+  // Check if playing glass on a go-again (5) means go-again
+  let effectiveGoAgain = isGoAgain;
+  if (isGlass && !isBurn) {
+    const effectiveTop = getEffectiveTopCard(newState.pile);
+    if (effectiveTop && effectiveTop.rank === GO_AGAIN_RANK) {
+      effectiveGoAgain = true;
+    }
+  }
+
   const playerName = getPlayerName(newState, socketId);
 
   if (isBurn) {
@@ -271,16 +341,43 @@ export function playCards(
       burned: [...newState.burned, ...newState.pile],
       pile: [],
       lastMessage: `${playerName} burned the pile! 🔥 Goes again.`,
+      goAgain: true,
+      turnPlayedRank: null, // Reset - can play any card now
+    };
+  } else if (effectiveGoAgain) {
+    newState = {
+      ...newState,
+      lastMessage: `${playerName} played a 5 — goes again! 🔄`,
+      goAgain: true,
+      turnPlayedRank: null, // Reset - can play any card now
     };
   } else if (isReset) {
     newState = {
       ...newState,
-      lastMessage: `${playerName} played a 2 — pile reset! Next player can play anything.`,
+      lastMessage: `${playerName} played a 2 — pile reset!`,
+      goAgain: false,
+      turnPlayedRank: playedRank,
+    };
+  } else if (isGlass) {
+    newState = {
+      ...newState,
+      lastMessage: `${playerName} played a 3 — invisible card! 👻`,
+      goAgain: false,
+      turnPlayedRank: playedRank,
+    };
+  } else if (isSkip) {
+    newState = {
+      ...newState,
+      lastMessage: `${playerName} played an 8 — skip! ⏭️`,
+      goAgain: false,
+      turnPlayedRank: playedRank,
     };
   } else {
     newState = {
       ...newState,
-      lastMessage: `${playerName} played ${cards.length}x ${cards[0].rank}.`,
+      lastMessage: `${playerName} played ${cards.length}x ${playedRank}.`,
+      goAgain: false,
+      turnPlayedRank: playedRank,
     };
   }
 
@@ -290,20 +387,23 @@ export function playCards(
   // Check if player is finished
   newState = checkPlayerFinished(newState, socketId);
 
-  // Advance turn (unless burn = same player goes again)
-  if (!isBurn) {
-    newState = advanceTurn(newState);
-  } else {
-    // If the player who burned is now finished, advance anyway
+  // If burn or go-again and player is finished, advance turn
+  if (isBurn || effectiveGoAgain) {
     const p = newState.players.find((pl) => pl.socketId === socketId);
     if (p?.isFinished) {
       newState = advanceTurn(newState);
+      newState = { ...newState, goAgain: false, turnPlayedRank: null };
     }
   }
 
   // Check if game is over
   newState = checkGameOver(newState);
   newState = { ...newState, lastActionTime: Date.now() };
+
+  // Reset consecutive timeout counter (player acted manually)
+  const timeouts = { ...newState.consecutiveTimeouts };
+  timeouts[socketId] = 0;
+  newState = { ...newState, consecutiveTimeouts: timeouts };
 
   return { state: newState, success: true, message: newState.lastMessage || '' };
 }
@@ -326,6 +426,8 @@ function playFaceDownFail(
   newState = {
     ...newState,
     lastMessage: `${playerName} flipped a ${card.rank} — can't play it! Picked up the pile. 😬`,
+    turnPlayedRank: null,
+    goAgain: false,
   };
 
   // Advance turn
@@ -354,12 +456,57 @@ export function pickUpPile(state: ShitheadGameState, socketId: string): PlayResu
     ...newState,
     pile: [],
     lastMessage: `${playerName} picked up the pile! (${state.pile.length} cards) 😬`,
+    turnPlayedRank: null,
+    goAgain: false,
   };
 
   newState = advanceTurn(newState);
   newState = { ...newState, lastActionTime: Date.now() };
 
+  // Reset consecutive timeout counter (player acted manually)
+  const timeouts = { ...newState.consecutiveTimeouts };
+  timeouts[socketId] = 0;
+  newState = { ...newState, consecutiveTimeouts: timeouts };
+
   return { state: newState, success: true, message: newState.lastMessage || '' };
+}
+
+// ── End Turn Explicitly ─────────────────────────────────────
+
+export function endPlayerTurn(state: ShitheadGameState, socketId: string): PlayResult {
+  if (state.phase !== 'playing') {
+    return { state, success: false, message: 'Game is not in playing phase.' };
+  }
+  if (state.currentTurn !== socketId) {
+    return { state, success: false, message: 'Not your turn!' };
+  }
+
+  // Check if 8 (skip) was the effective top card - skip extra player
+  // But only if there are 3+ players (with 2 players, 8 is just a normal 8)
+  const effectiveTop = getEffectiveTopCard(state.pile);
+  const shouldSkip = effectiveTop && effectiveTop.rank === SKIP_RANK && state.players.length >= 3;
+
+  // Advance to next player (skip twice if 8 was played with 3+ players)
+  let newState = advanceTurn(state);
+  if (shouldSkip) {
+    // Skip one more player (8 skips)
+    newState = advanceTurn(newState);
+  }
+  
+  // Clear turn tracking flags
+  newState = { 
+    ...newState, 
+    lastActionTime: Date.now(),
+    turnPlayedRank: null,
+    goAgain: false,
+  };
+
+  // Reset consecutive timeout counter
+  const timeouts = { ...newState.consecutiveTimeouts };
+  timeouts[socketId] = 0;
+  newState = { ...newState, consecutiveTimeouts: timeouts };
+
+  return { state: newState, success: true, message: '' };
 }
 
 // ── Helper Functions ────────────────────────────────────────
@@ -459,7 +606,7 @@ function advanceTurn(state: ShitheadGameState): ShitheadGameState {
   const nextIdx = (currentIdx + state.direction + activePlayers.length) % activePlayers.length;
   const nextTurn = activePlayers[nextIdx];
 
-  return { ...state, currentTurn: nextTurn };
+  return { ...state, currentTurn: nextTurn, turnStartTime: Date.now() };
 }
 
 function checkGameOver(state: ShitheadGameState): ShitheadGameState {
@@ -518,7 +665,150 @@ export function hasPlayableCard(state: ShitheadGameState, socketId: string): boo
   // Face-down cards are always "playable" (you just might fail)
   if (zone.type === 'faceDown') return true;
 
-  return zone.cards.some((c) => canPlayOnPile(c, state.pile));
+  // Check if cards can be played on the pile
+  let playable = zone.cards.filter((c) => canPlayOnPile(c, state.pile));
+
+  // If turnPlayedRank is set and goAgain is false, only cards matching that rank are playable
+  if (!state.goAgain && state.turnPlayedRank !== null) {
+    playable = playable.filter((c) => c.rank === state.turnPlayedRank);
+  }
+
+  return playable.length > 0;
+}
+
+// ── Auto-Play for Timeout ───────────────────────────────────
+
+/**
+ * Auto-play the lowest playable card when time runs out.
+ * If no card can be played, picks up the pile.
+ */
+export function autoPlayForTimeout(
+  state: ShitheadGameState,
+  socketId: string
+): PlayResult {
+  if (state.phase !== 'playing' || state.currentTurn !== socketId) {
+    return { state, success: false, message: 'Cannot auto-play.' };
+  }
+
+  const player = state.players.find((p) => p.socketId === socketId);
+  if (!player) return { state, success: false, message: 'Player not found.' };
+
+  const zone = getPlayableZone(player);
+  if (!zone) return pickUpPile(state, socketId);
+
+  // Face-down: just play the first one (random anyway)
+  if (zone.type === 'faceDown') {
+    const result = playCards(state, socketId, [zone.cards[0].id]);
+    if (!result.success) return result;
+    // Check if go-again is active (burn or 5)
+    if (result.state.goAgain) {
+      return result; // Don't end turn - player goes again
+    }
+    return endPlayerTurn(result.state, socketId);
+  }
+
+  // Filter playable cards:
+  // 1. Must be playable on the pile
+  // 2. If turnPlayedRank is set and goAgain is false, must match that rank
+  let playable = zone.cards.filter((c) => canPlayOnPile(c, state.pile));
+  
+  if (!state.goAgain && state.turnPlayedRank !== null) {
+    // Must match the rank already played this turn
+    playable = playable.filter((c) => c.rank === state.turnPlayedRank);
+  }
+
+  // Sort by value (ascending) — play the weakest
+  playable.sort((a, b) => getRankValue(a.rank) - getRankValue(b.rank));
+
+  if (playable.length > 0) {
+    const result = playCards(state, socketId, [playable[0].id]);
+    if (!result.success) return result;
+    // Check if go-again is active (burn or 5)
+    if (result.state.goAgain) {
+      return result; // Don't end turn - player goes again
+    }
+    return endPlayerTurn(result.state, socketId);
+  }
+
+  // No playable card — pick up
+  return pickUpPile(state, socketId);
+}
+
+// ── Forfeit Player ──────────────────────────────────────────
+
+/**
+ * Force a player to forfeit (AFK 3x or disconnected too long).
+ * In a 2-player game the forfeiter becomes the shithead.
+ * In N-player games the game continues without them.
+ */
+export function forfeitPlayer(
+  state: ShitheadGameState,
+  socketId: string
+): ShitheadGameState {
+  const player = state.players.find((p) => p.socketId === socketId);
+  if (!player || player.isFinished) return state;
+
+  const playerName = player.displayName;
+
+  // Remove from turn order
+  const turnOrder = state.turnOrder.filter((s) => s !== socketId);
+
+  // Count remaining active players (excluding the forfeiter)
+  const activeAfterForfeit = state.players.filter(
+    (p) => !p.isFinished && p.socketId !== socketId
+  );
+
+  if (activeAfterForfeit.length <= 1) {
+    // Game is effectively over — forfeiter is the shithead
+    const winnerId = activeAfterForfeit[0]?.socketId ?? null;
+    const finishOrder = [...state.finishOrder];
+    if (winnerId && !finishOrder.includes(winnerId)) finishOrder.push(winnerId);
+    if (!finishOrder.includes(socketId)) finishOrder.push(socketId);
+
+    const players = state.players.map((p) => {
+      const pos = finishOrder.indexOf(p.socketId);
+      if (pos === -1) return p;
+      return { ...p, isFinished: true, finishPosition: pos + 1 };
+    });
+
+    return {
+      ...state,
+      phase: 'finished',
+      players,
+      turnOrder,
+      finishOrder,
+      shithead: socketId,
+      winner: winnerId ?? state.winner,
+      currentTurn: null,
+      lastMessage: `${playerName} forfeited! They're the Shithead! 💩`,
+      lastActionTime: Date.now(),
+      turnStartTime: Date.now(),
+    };
+  }
+
+  // Multiple players remain — just remove the forfeiter
+  const finishOrder = [...state.finishOrder, socketId];
+  const position = finishOrder.length;
+  const players = state.players.map((p) => {
+    if (p.socketId !== socketId) return p;
+    return { ...p, isFinished: true, finishPosition: position };
+  });
+
+  let newState: ShitheadGameState = {
+    ...state,
+    players,
+    turnOrder,
+    finishOrder,
+    lastMessage: `${playerName} forfeited (AFK). Game continues!`,
+    lastActionTime: Date.now(),
+  };
+
+  // If it was their turn, advance
+  if (state.currentTurn === socketId) {
+    newState = advanceTurn(newState);
+  }
+
+  return newState;
 }
 
 // ── Serialization ───────────────────────────────────────────
